@@ -1,6 +1,8 @@
 export interface DockerStoreState {
   initialized: boolean
+  isLoadingContainers: boolean
   containers: DockerStoreContainer[]
+  blockedContainerIds: string[]
 }
 
 export interface DockerStorePort {
@@ -17,4 +19,28 @@ export interface DockerStoreContainer {
   state: string
   status: string
   created: number
+}
+
+export interface DockerContainerRestartRequest {
+  id: string
+}
+
+export interface DockerContainerPauseRequest {
+  id: string
+}
+
+export interface DockerContainerStopRequest {
+  id: string
+}
+
+export interface DockerContainerUnpauseRequest {
+  id: string
+}
+
+export interface DockerContainerStartRequest {
+  id: string
+}
+
+export interface DockerContainerRemoveRequest {
+  id: string
 }

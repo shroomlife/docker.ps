@@ -1,13 +1,17 @@
 <script lang="ts" setup>
 import type { NavigationMenuItem } from '@nuxt/ui'
 
-const navigationItems: NavigationMenuItem[] = [
-  {
-    label: 'Containers',
-    icon: 'tabler:stack-2',
-    to: '/',
-  },
-]
+const navigationItems: ComputedRef<NavigationMenuItem[]> = computed(() => {
+  const route = useRoute()
+  return [
+    {
+      label: 'Containers',
+      icon: 'tabler:stack-2',
+      to: '/containers',
+      active: route.path.startsWith('/containers'),
+    },
+  ]
+})
 </script>
 
 <template>
