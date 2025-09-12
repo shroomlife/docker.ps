@@ -1,4 +1,4 @@
-import type { Container, ContainerInfo, ContainerInspectInfo } from 'dockerode'
+import type { ContainerInfo, ContainerInspectInfo } from 'dockerode'
 import Dockerode from 'dockerode'
 
 export const DockerService = {
@@ -22,7 +22,7 @@ export const DockerService = {
       id: container.Id,
       name: container.Name.slice(1),
       ports: Object.entries(container.NetworkSettings.Ports).flatMap(([key, mappings]) => {
-        const privatePort = parseInt(key.split('/')[0], 10)
+        const privatePort = parseInt(String(key).split('/').shift() ?? '', 10)
         if (mappings) {
           return mappings.map(mapping => ({
             ip: mapping.HostIp,
@@ -44,7 +44,7 @@ export const DockerService = {
   simplifyContainerInfo(container: ContainerInfo): DockerStoreContainer {
     return {
       id: container.Id,
-      name: container.Names[0].slice(1),
+      name: container.Names.shift()?.slice(1) ?? '',
       ports: container.Ports.map(port => ({
         ip: port.IP,
         privatePort: port.PrivatePort,
