@@ -1,4 +1,4 @@
-import type { ContainerInfo, ContainerInspectInfo } from 'dockerode'
+import type { ContainerInfo, ContainerInspectInfo, ImageInfo } from 'dockerode'
 import Dockerode from 'dockerode'
 
 export const DockerService = {
@@ -39,9 +39,10 @@ export const DockerService = {
       state: container.State.Status,
       status: container.State.Status,
       created: Math.floor(new Date(container.Created).getTime() / 1000),
+      isHost: false,
     }
   },
-  simplifyContainerInfo(container: ContainerInfo): DockerStoreContainer {
+  simplifyContainerInfo(container: ContainerInfo, selfImage: ImageInfo): DockerStoreContainer {
     return {
       id: container.Id,
       name: container.Names.shift()?.slice(1) ?? '',
@@ -54,6 +55,7 @@ export const DockerService = {
       state: container.State,
       status: container.Status,
       created: container.Created,
+      isHost: container.ImageID === selfImage.Id,
     }
   },
 }

@@ -19,6 +19,7 @@ export interface DockerStoreContainer {
   state: string
   status: string
   created: number
+  isHost: boolean
 }
 
 export interface DockerContainerRestartRequest {

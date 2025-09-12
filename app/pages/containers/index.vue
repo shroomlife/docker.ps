@@ -62,6 +62,8 @@ const computedContainers = computed(() => {
     || container.status.toLowerCase().includes(searchValue.value.toLowerCase())
     || container.state.toLowerCase().includes(searchValue.value.toLowerCase()),
   )
+  // sort isHost true as last
+    .sort((a, b) => Number(a.isHost) - Number(b.isHost))
 })
 
 onMounted(() => {
@@ -116,13 +118,14 @@ onMounted(() => {
               :columns="columns"
               :data="computedContainers"
               :ui="{
-                tbody: '[&>tr]:hover:bg-elevated/25',
+                tbody: '[&>tr]:hover:bg-elevated/50',
+                th: 'text-md',
               }"
             >
               <template #state-cell="{ row }">
                 <UBadge
                   :color="getStateBadgeColor(row.original.state)"
-                  variant="soft"
+                  variant="solid"
                   size="lg"
                 >
                   {{ row.original.state }}
@@ -130,17 +133,16 @@ onMounted(() => {
               </template>
 
               <template #image-cell="{ row }">
-                <div class="flex gap-1">
+                <div class="flex gap-2 items-center">
                   <UBadge
-                    variant="solid"
+                    variant="soft"
                     color="info"
                     size="lg"
                   >
                     {{ String(row.original.image).split(':')[0] }}
                   </UBadge>
-                  :
                   <UBadge
-                    variant="soft"
+                    variant="outline"
                     color="info"
                     size="lg"
                   >
@@ -156,11 +158,20 @@ onMounted(() => {
                   :to="`/containers/${row.original.id}`"
                   size="xl"
                   icon="tabler:stack-filled"
+                  :disabled="row.original.isHost"
+                  color="info"
+                  :ui="{
+                    base: 'w-full',
+                    label: 'text-lg',
+                  }"
                 />
               </template>
 
               <template #actions-cell="{ row }">
-                <div class="flex gap-2 items-center">
+                <div
+                  v-if="!row.original.isHost"
+                  class="flex gap-2 items-center"
+                >
                   <ContainerUnpauseButton
                     v-if="row.original.state === 'paused'"
                     :id="row.original.id"
