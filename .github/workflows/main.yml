@@ -43,8 +43,8 @@ jobs:
 
       - name: Build and Push Docker Production Image
         run: |
-          docker build -f Dockerfile.production -t shroomlife/rltytrck:latest . &&
-          docker push shroomlife/rltytrck:latest
+          docker build -t shroomlife/docker.ps:latest . &&
+          docker push shroomlife/docker.ps:latest
 
   Deploy:
     needs: Build
