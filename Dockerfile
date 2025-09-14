@@ -22,6 +22,8 @@ RUN bun install --production --ignore-scripts
 
 FROM oven/bun:1.2.21-alpine AS runtime
 
+LABEL docker.ps.self="true"
+
 WORKDIR /app
 
 ENV NODE_ENV=production

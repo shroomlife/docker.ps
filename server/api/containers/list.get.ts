@@ -1,15 +1,11 @@
-import type { ContainerInfo, ImageInfo } from 'dockerode'
+import type { ContainerInfo } from 'dockerode'
 
 export default defineEventHandler(async (): Promise<DockerStoreContainer[]> => {
   const docker = DockerService.getDockerHost()
   const containers = await docker.listContainers({
     all: true,
   })
-
-  const images = await docker.listImages()
-  const selfImage = images.find(image => image.RepoTags?.includes('shroomlife/docker.ps:latest')) as ImageInfo
-
   return containers
-    .filter(container => container.ImageID !== selfImage.Id)
+    .filter(container => container.Labels?.['docker.ps.self'] !== 'true')
     .map((container: ContainerInfo) => (DockerService.simplifyContainerInfo(container)))
 })

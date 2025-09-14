@@ -1,6 +1,9 @@
 <script lang="ts" setup>
 import type { NavigationMenuItem } from '@nuxt/ui'
 
+const runtimeConfig = useRuntimeConfig()
+const appVersion = runtimeConfig.public.appVersion || '0.0.0'
+
 const navigationItems: ComputedRef<NavigationMenuItem[]> = computed(() => {
   const route = useRoute()
   return [
@@ -16,7 +19,7 @@ const navigationItems: ComputedRef<NavigationMenuItem[]> = computed(() => {
 
 <template>
   <UDashboardGroup>
-    <UDashboardSidebar>
+    <UDashboardSidebar :ui="{ footer: 'border-t border-default', header: 'border-b border-default' }">
       <template #header>
         <NuxtLink
           class="flex justify-start items-center gap-2 hover:opacity-80"
@@ -38,7 +41,15 @@ const navigationItems: ComputedRef<NavigationMenuItem[]> = computed(() => {
       </template>
 
       <template #footer>
-        <div>&copy; {{ new Date().getFullYear() }} shroomlife</div>
+        <div class="flex justify-between items-center w-full">
+          <span>docker.ps</span>
+          <UBadge
+            variant="soft"
+            color="neutral"
+          >
+            v{{ appVersion }}
+          </UBadge>
+        </div>
       </template>
     </UDashboardSidebar>
 
