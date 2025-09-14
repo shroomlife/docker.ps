@@ -10,5 +10,6 @@ export default defineEventHandler(async (): Promise<DockerStoreContainer[]> => {
   const selfImage = images.find(image => image.RepoTags?.includes('shroomlife/docker.ps:latest')) as ImageInfo
 
   return containers
-    .map((container: ContainerInfo) => (DockerService.simplifyContainerInfo(container, selfImage)))
+    .filter(container => container.ImageID !== selfImage.Id)
+    .map((container: ContainerInfo) => (DockerService.simplifyContainerInfo(container)))
 })

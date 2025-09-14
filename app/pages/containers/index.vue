@@ -62,8 +62,6 @@ const computedContainers = computed(() => {
     || container.status.toLowerCase().includes(searchValue.value.toLowerCase())
     || container.state.toLowerCase().includes(searchValue.value.toLowerCase()),
   )
-  // sort isHost true as last
-    .sort((a, b) => Number(a.isHost) - Number(b.isHost))
 })
 
 onMounted(() => {
@@ -158,7 +156,6 @@ onMounted(() => {
                   :to="`/containers/${row.original.id}`"
                   size="xl"
                   icon="tabler:stack-filled"
-                  :disabled="row.original.isHost"
                   color="info"
                   :ui="{
                     base: 'w-full',
@@ -169,7 +166,6 @@ onMounted(() => {
 
               <template #actions-cell="{ row }">
                 <div
-                  v-if="!row.original.isHost"
                   class="flex gap-2 items-center"
                 >
                   <ContainerUnpauseButton
