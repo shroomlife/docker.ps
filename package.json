@@ -1,5 +1,6 @@
 {
   "name": "docker.ps",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "build": "nuxt build",
@@ -9,10 +10,10 @@
     "docker:push": "docker push shroomlife/docker.ps:latest",
     "generate": "nuxt generate",
     "postinstall": "nuxt prepare",
+    "lint": "eslint . --ext .ts,.vue",
+    "lint:fix": "eslint . --ext .ts,.vue --fix",
     "preview": "nuxt preview",
-    "typecheck": "nuxt typecheck",
-    "lint": "eslint --ext .js,.ts,.vue .",
-    "lint:fix": "eslint --fix --ext .js,.ts,.vue ."
+    "typecheck": "nuxt typecheck"
   },
   "dependencies": {
     "dockerode": "4.0.8",
