@@ -2,6 +2,7 @@
 import type { TableColumn, BadgeProps } from '@nuxt/ui'
 import moment from 'moment'
 
+const UButton = resolveComponent('UButton')
 const dockerStore = useDockerStore()
 
 const searchValue = ref<string>('')
@@ -9,7 +10,21 @@ const searchValue = ref<string>('')
 const columns: TableColumn<DockerStoreContainer>[] = [
   {
     accessorKey: 'name',
-    header: 'Name',
+    header: ({ column }) => {
+      const isSorted = column.getIsSorted()
+      return h(UButton, {
+        color: 'neutral',
+        variant: 'ghost',
+        label: 'Name',
+        icon: isSorted
+          ? isSorted === 'asc'
+            ? 'i-lucide-arrow-up-narrow-wide'
+            : 'i-lucide-arrow-down-wide-narrow'
+          : 'i-lucide-arrow-up-down',
+        class: '-mx-2.5',
+        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc'),
+      })
+    },
   },
   {
     accessorKey: 'image',
@@ -23,7 +38,21 @@ const columns: TableColumn<DockerStoreContainer>[] = [
   {
     id: 'status',
     accessorKey: 'status',
-    header: 'Status',
+    header: ({ column }) => {
+      const isSorted = column.getIsSorted()
+      return h(UButton, {
+        color: 'neutral',
+        variant: 'ghost',
+        label: 'Status',
+        icon: isSorted
+          ? isSorted === 'asc'
+            ? 'i-lucide-arrow-up-narrow-wide'
+            : 'i-lucide-arrow-down-wide-narrow'
+          : 'i-lucide-arrow-up-down',
+        class: '-mx-2.5',
+        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc'),
+      })
+    },
   },
   {
     id: 'created',
