@@ -1,6 +1,8 @@
 <script lang="ts" setup>
 import type { NavigationMenuItem } from '@nuxt/ui'
 
+const userStore = useUserStore()
+
 const runtimeConfig = useRuntimeConfig()
 const appVersion = runtimeConfig.public.appVersion || '0.0.0'
 
@@ -15,10 +17,18 @@ const navigationItems: ComputedRef<NavigationMenuItem[]> = computed(() => {
     },
   ]
 })
+
+onMounted(() => {
+  if (!userStore.isLoggedIn) {
+    navigateTo('/auth/login')
+  }
+})
 </script>
 
 <template>
-  <UDashboardGroup>
+  <UDashboardGroup
+    v-if="userStore.isLoggedIn"
+  >
     <UDashboardSidebar :ui="{ footer: 'border-t border-default', header: 'border-b border-default' }">
       <template #header>
         <NuxtLink

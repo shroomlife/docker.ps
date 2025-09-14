@@ -1,0 +1,14 @@
+services:
+
+  postgres_docker_ps:
+    container_name: postgres_docker_ps
+    image: postgres:latest
+    restart: always
+    environment:
+      POSTGRES_DB: dockerps
+      POSTGRES_USER: dockerps
+      POSTGRES_PASSWORD: a5iotjpoiant3_u8owafiubi_25hIUABibajhsbfajlfbwa
+    volumes:
+      - "C:\\code\\usr\\shroomlife\\volumes\\docker.ps\\postgres:/var/lib/postgresql/data"
+    ports:
+      - "5432:5432"

@@ -6,6 +6,6 @@ export default defineEventHandler(async (): Promise<DockerStoreContainer[]> => {
     all: true,
   })
   return containers
-    .filter(container => container.Labels?.['docker.ps.self'] !== 'true')
+    .filter(container => container.Labels?.['docker.ps-agent'] !== 'true')
     .map((container: ContainerInfo) => (DockerService.simplifyContainerInfo(container)))
 })
