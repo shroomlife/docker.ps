@@ -28,6 +28,7 @@ onMounted(() => {
     variant="soft"
     :loading="isLoading"
     :disabled="isDisabled"
+    class="h-16"
     @click="handleLogin"
   >
     Continue with Google

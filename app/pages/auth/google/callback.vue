@@ -1,8 +1,10 @@
 <script lang="ts" setup>
 const userStore = useUserStore()
 
-definePageMeta({
-  layout: 'login',
+useHead({
+  bodyAttrs: {
+    class: 'login-background',
+  },
 })
 
 onMounted(async () => {
@@ -26,25 +28,27 @@ onMounted(async () => {
       icon: 'tabler:alert-circle',
     })
     setTimeout(() => {
-      navigateTo('/auth/login')
+      navigateTo('/login')
     }, 4000)
   }
 })
 </script>
 
 <template>
-  <div class="flex justify-center items-center w-full h-64 rounded-lg bg-gray-100 p-4">
-    <div class="flex flex-col justify-center items-center gap-3">
-      <UIcon
-        name="material-icon-theme:google"
-        class="animate-bounce"
-        size="64"
-      />
-      <div class="text-lg font-semibold text-center">
-        Du wirst sicher mit Google angemeldet.
+  <AuthCard>
+    <div class="flex justify-center items-center w-full h-64 rounded-lg bg-gray-100 p-4">
+      <div class="flex flex-col justify-center items-center gap-3">
+        <UIcon
+          name="material-icon-theme:google"
+          class="animate-bounce"
+          size="64"
+        />
+        <div class="text-lg font-semibold text-center">
+          Du wirst sicher mit Google angemeldet.
+        </div>
       </div>
     </div>
-  </div>
+  </AuthCard>
 </template>
 
 <style lang="scss" scoped>

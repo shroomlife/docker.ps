@@ -1,8 +1,7 @@
-import type { User } from '@prisma/client'
 import type { H3Event, EventHandlerRequest } from 'h3'
 import jwt from 'jsonwebtoken'
 
-export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): Promise<User> => {
+export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): Promise<AppUser> => {
   const cookieData = getCookie(event, AuthSettings.cookie.name) as string | undefined
 
   if (!cookieData) {
@@ -17,6 +16,7 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): P
         uuid: decodedCookieData.userId,
         AND: { identities: { some: { uuid: decodedCookieData.identityId } } },
       },
+      include: { dockerHosts: true },
     })
 
     if (!foundUser) {

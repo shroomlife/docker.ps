@@ -2,6 +2,10 @@
 import type { TableColumn, BadgeProps } from '@nuxt/ui'
 import moment from 'moment'
 
+definePageMeta({
+  layout: 'app',
+})
+
 const UButton = resolveComponent('UButton')
 const dockerStore = useDockerStore()
 
@@ -99,136 +103,125 @@ onMounted(() => {
 </script>
 
 <template>
-  <UDashboardPanel>
-    <template
-      #header
-    >
-      <UDashboardNavbar class="lg:hidden" />
-    </template>
-    <template #body>
-      <UPage>
-        <UPageHeader
-          title="Containers"
-          description="List of all running Docker containers."
-        />
-        <UPageBody>
-          <div class="flex flex-col flex-1 w-full">
-            <div class="flex justify-between px-4 py-3.5 border border-accented flex-wrap gap-4">
-              <div class="flex gap-2 items-center font-medium flex-wrap">
-                <UIcon
-                  size="24"
-                  name="tabler:stack-2"
-                />
-                <span>{{ computedContainers.length }} Containers</span>
-              </div>
-              <div class="flex items-center gap-1 grow justify-end">
-                <UInput
-                  v-model="searchValue"
-                  placeholder="Search Containers ..."
-                  size="lg"
-                  class="lg:w-72 grow sm:max-w-72"
-                  icon="tabler:search"
-                />
-                <UButton
-                  icon="tabler:refresh-dot"
-                  size="lg"
-                  color="neutral"
-                  variant="soft"
-                  :loading="dockerStore.getIsLoadingContainers"
-                  @click="dockerStore.loadContainers()"
-                />
-              </div>
-            </div>
+  <AppDashboardPage
+    :headline="dockerStore.getCurrentHost?.name"
+    title="Containers"
+    description="List of all running Docker containers."
+  >
+    <div class="flex flex-col flex-1 w-full">
+      <div class="flex justify-between px-4 py-3.5 border border-accented flex-wrap gap-4">
+        <div class="flex gap-2 items-center font-medium flex-wrap">
+          <UIcon
+            size="24"
+            name="tabler:stack-2"
+          />
+          <span>{{ computedContainers.length }} Containers</span>
+        </div>
+        <div class="flex items-center gap-1 grow justify-end">
+          <UInput
+            v-model="searchValue"
+            placeholder="Search Containers ..."
+            size="lg"
+            class="lg:w-72 grow sm:max-w-72"
+            icon="tabler:search"
+          />
+          <UButton
+            icon="tabler:refresh-dot"
+            size="lg"
+            color="neutral"
+            variant="soft"
+            :loading="dockerStore.getIsLoadingContainers"
+            @click="dockerStore.loadContainers()"
+          />
+        </div>
+      </div>
 
-            <UTable
-              :loading="dockerStore.getIsLoadingContainers"
-              :columns="columns"
-              :data="computedContainers"
-              :ui="{
-                tbody: '[&>tr]:hover:bg-elevated/50',
-                th: 'text-md',
-              }"
+      <UTable
+        :loading="dockerStore.getIsLoadingContainers"
+        :columns="columns"
+        :data="computedContainers"
+        :ui="{
+          tbody: '[&>tr]:hover:bg-elevated/50',
+          th: 'text-md',
+        }"
+      >
+        <template #state-cell="{ row }">
+          <UBadge
+            :color="getStateBadgeColor(row.original.state)"
+            variant="solid"
+            size="lg"
+          >
+            {{ row.original.state }}
+          </UBadge>
+        </template>
+
+        <template #image-cell="{ row }">
+          <div class="flex gap-2 items-center">
+            <UBadge
+              variant="soft"
+              color="info"
+              size="lg"
             >
-              <template #state-cell="{ row }">
-                <UBadge
-                  :color="getStateBadgeColor(row.original.state)"
-                  variant="solid"
-                  size="lg"
-                >
-                  {{ row.original.state }}
-                </UBadge>
-              </template>
-
-              <template #image-cell="{ row }">
-                <div class="flex gap-2 items-center">
-                  <UBadge
-                    variant="soft"
-                    color="info"
-                    size="lg"
-                  >
-                    {{ String(row.original.image).split(':')[0] }}
-                  </UBadge>
-                  <UBadge
-                    variant="outline"
-                    color="info"
-                    size="lg"
-                  >
-                    {{ String(row.original.image).split(':')[1] }}
-                  </UBadge>
-                </div>
-              </template>
-
-              <template #name-cell="{ row }">
-                <UButton
-                  :label="row.original.name"
-                  variant="link"
-                  :to="`/containers/${row.original.id}`"
-                  size="xl"
-                  icon="tabler:stack-filled"
-                  color="info"
-                  :ui="{
-                    base: 'w-full',
-                    label: 'text-lg',
-                  }"
-                />
-              </template>
-
-              <template #actions-cell="{ row }">
-                <div
-                  class="flex gap-2 items-center"
-                >
-                  <ContainerUnpauseButton
-                    v-if="row.original.state === 'paused'"
-                    :id="row.original.id"
-                  />
-                  <ContainerStartButton
-                    v-if="row.original.state === 'exited'"
-                    :id="row.original.id"
-                  />
-                  <ContainerPauseButton
-                    v-if="row.original.state === 'running'"
-                    :id="row.original.id"
-                  />
-                  <ContainerRestartButton
-                    v-if="row.original.state !== 'exited'"
-                    :id="row.original.id"
-                  />
-                  <ContainerStopButton
-                    v-if="row.original.state !== 'exited'"
-                    :id="row.original.id"
-                  />
-                  <ContainerRemoveButton
-                    v-if="row.original.state === 'exited'"
-                    :id="row.original.id"
-                  />
-                </div>
-              </template>
-            </UTable>
+              {{ String(row.original.image).split(':')[0] }}
+            </UBadge>
+            <UBadge
+              variant="outline"
+              color="info"
+              size="lg"
+            >
+              {{ String(row.original.image).split(':')[1] }}
+            </UBadge>
           </div>
-        </UPageBody>
-      </UPage>
-    </template>
-  </UDashboardPanel>
+        </template>
+
+        <template #name-cell="{ row }">
+          <UButton
+            :label="row.original.name"
+            variant="link"
+            :to="`/containers/${row.original.id}`"
+            size="xl"
+            icon="tabler:stack-filled"
+            color="info"
+            :ui="{
+              base: 'w-full',
+              label: 'text-lg',
+            }"
+          />
+        </template>
+
+        <template #actions-cell="{ row }">
+          <div
+            class="flex gap-2 items-center"
+          >
+            <ContainerUnpauseButton
+              v-if="row.original.state === 'paused'"
+              :id="row.original.id"
+            />
+            <ContainerStartButton
+              v-if="row.original.state === 'exited'"
+              :id="row.original.id"
+            />
+            <ContainerPauseButton
+              v-if="row.original.state === 'running'"
+              :id="row.original.id"
+            />
+            <ContainerRestartButton
+              v-if="row.original.state !== 'exited'"
+              :id="row.original.id"
+            />
+            <ContainerStopButton
+              v-if="row.original.state !== 'exited'"
+              :id="row.original.id"
+            />
+            <ContainerRemoveButton
+              v-if="row.original.state === 'exited'"
+              :id="row.original.id"
+            />
+          </div>
+        </template>
+      </UTable>
+    </div>
+  </AppDashboardPage>
 </template>
 
 <style lang="scss" scoped>

@@ -1,5 +1,4 @@
 import { defineStore } from 'pinia'
-import type { User } from '@prisma/client'
 
 export const useUserStore = defineStore('UserStore', {
   state: (): UserStoreState => ({
@@ -7,12 +6,17 @@ export const useUserStore = defineStore('UserStore', {
     currentUser: null,
   }),
   actions: {
+    hasAuthCookie(): boolean {
+      const userCookie = useCookie(AuthSettings.cookie.name, AuthSettings.cookie.options)
+      return !!userCookie.value
+    },
     async initialize() {
       if (this.isInitialized) return
       const userCookie = useCookie(AuthSettings.cookie.name, AuthSettings.cookie.options)
       if (userCookie.value) {
         try {
-          this.currentUser = await $fetch<User>(`/api/auth/me`)
+          const loadedUser = await $fetch<AppUser>(`/api/auth/me`)
+          this.setCurrentUser(loadedUser)
         }
         catch (error) {
           console.error('Error verifying User Cookie:', error)
@@ -32,10 +36,11 @@ export const useUserStore = defineStore('UserStore', {
     },
     async callbackLoginWithGoogle(code: string, state: string) {
       try {
-        this.currentUser = await $fetch<User>('/api/auth/google/callback', {
+        const loadedUser = await $fetch<AppUser>('/api/auth/google/callback', {
           method: 'POST',
           body: { code, state },
         })
+        this.setCurrentUser(loadedUser)
       }
       catch (error) {
         console.error('Error in callbackLoginWithGoogle:', error)
@@ -47,7 +52,11 @@ export const useUserStore = defineStore('UserStore', {
       this.currentUser = null
       const userCookie = useCookie(AuthSettings.cookie.name, AuthSettings.cookie.options)
       userCookie.value = null
-      navigateTo('/auth/login')
+    },
+    setCurrentUser(user: AppUser) {
+      this.currentUser = user
+      const dockerStore = useDockerStore()
+      dockerStore.addHosts(user.dockerHosts)
     },
   },
   getters: {

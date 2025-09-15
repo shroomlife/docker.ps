@@ -2,6 +2,7 @@ import type { H3Event, EventHandlerRequest } from 'h3'
 import { createHmac } from 'crypto'
 import type { SignOptions } from 'jsonwebtoken'
 import jwt from 'jsonwebtoken'
+import type { AppUser } from '~~/shared/types/user'
 
 export const AuthService = {
   base64urlEncode(s: string) { return Buffer.from(s, 'utf8').toString('base64url') },
@@ -29,38 +30,47 @@ export const AuthService = {
       maxAge: 7 * 24 * 60 * 60,
     })
   },
-  // async getUser(event: H3Event<EventHandlerRequest>): Promise<User | null> {
-  //   try {
-  //     const cookieData = getCookie(event, AuthSettings.cookie.name) as string
-  //     if (!cookieData) return null
+  async getUser(event: H3Event<EventHandlerRequest>): Promise<AppUser | null> {
+    try {
+      const cookieData = getCookie(event, AuthSettings.cookie.name) as string
+      if (!cookieData) return null
 
-  //     const decodedCookieData = jwt.verify(cookieData, AuthSettings.jwt.secret()) as UserCookiePayload
-  //     const foundMagicLogin = await UserService.getActiveMagicLoginByUuidAndToken(decodedCookieData.uuid, decodedCookieData.token)
-  //     if (!foundMagicLogin) return null
-  //     return foundMagicLogin.user
-  //   }
-  //   catch (error) {
-  //     console.error('Error in AuthService.getUser:', error)
-  //   }
+      const runtimeConfig = useRuntimeConfig()
+      const decodedCookieData = jwt.verify(cookieData, runtimeConfig.jwtSecret) as UserCookiePayload
+      const foundUser = await prismaClient.user.findUnique({
+        where: {
+          uuid: decodedCookieData.userId,
+          AND: { identities: { some: { uuid: decodedCookieData.identityId } } },
+        },
+        include: { dockerHosts: true },
+      })
 
-  //   return null
-  // },
-  // async getUserOrFail(event: H3Event<EventHandlerRequest>): Promise<UserWithRelations> {
-  //   try {
-  //     const foundUser = await AuthService.getUser(event)
-  //     if (foundUser) {
-  //       return foundUser
-  //     }
-  //   }
-  //   catch (error) {
-  //     console.error('Error in AuthService.getUserOrFail:', error)
-  //     throw createError({
-  //       statusCode: 500,
-  //       statusMessage: String(error),
-  //     })
-  //   }
-  //   throw createError({
-  //     statusCode: 500,
-  //   })
-  // },
+      if (!foundUser) {
+        throw new Error('User Not Found')
+      }
+
+      return foundUser
+    }
+    catch (error) {
+      console.error('Error at User Self', error)
+    }
+
+    return null
+  },
+  async getUserOrFail(event: H3Event<EventHandlerRequest>): Promise<AppUser> {
+    try {
+      const user = await AuthService.getUser(event)
+      if (user) return user
+    }
+    catch (error) {
+      console.error('Error in AuthService.getUserOrFail:', error)
+      throw createError({
+        statusCode: 500,
+        statusMessage: String(error),
+      })
+    }
+    throw createError({
+      statusCode: 500,
+    })
+  },
 }

@@ -1,4 +1,8 @@
+import type { DockerHost } from '@prisma/client'
+
 export interface DockerStoreState {
+  currentHost: DockerHost | null
+  availableHosts: DockerHost[]
   initialized: boolean
   isLoadingContainers: boolean
   containers: DockerStoreContainer[]
@@ -43,4 +47,10 @@ export interface DockerContainerStartRequest {
 
 export interface DockerContainerRemoveRequest {
   id: string
+}
+
+export interface DockerHostAddRequestBody {
+  name: string
+  url: string
+  authKey: string
 }

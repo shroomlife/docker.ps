@@ -1,8 +1,11 @@
+import type { DockerHost } from '@prisma/client'
 import { defineStore } from 'pinia'
 
 export const useDockerStore = defineStore('DockerStore', {
   state: (): DockerStoreState => {
     return {
+      currentHost: null,
+      availableHosts: [],
       initialized: false,
       isLoadingContainers: false,
       containers: [],
@@ -10,6 +13,33 @@ export const useDockerStore = defineStore('DockerStore', {
     }
   },
   actions: {
+    async addHost(name: string, url: string, authKey: string) {
+      const newHost = await $fetch<DockerHost>('/api/hosts/add', {
+        method: 'POST',
+        body: {
+          name,
+          url,
+          authKey,
+        } as DockerHostAddRequestBody,
+      })
+      this.availableHosts.push(newHost)
+      if (!this.currentHost) {
+        this.currentHost = newHost
+      }
+    },
+    addHosts(hosts: DockerHost[]) {
+      this.availableHosts = hosts
+    },
+
+    async setCurrentHost(uuid: string) {
+      const foundHost = this.availableHosts.find(host => host.uuid === uuid)
+      if (foundHost) {
+        this.currentHost = foundHost
+        return
+      }
+      throw new Error('Host Not Found')
+    },
+
     async initialize() {
       await this.loadContainers()
       this.initialized = true
@@ -52,6 +82,9 @@ export const useDockerStore = defineStore('DockerStore', {
     },
   },
   getters: {
+    getCurrentHost: state => state.currentHost,
+    getHasCurrentHost: state => !!state.currentHost,
+    getAvailableHosts: state => state.availableHosts,
     isInitialized: state => state.initialized,
     getContainers: state => state.containers,
     getBlockedContainerIds: state => state.blockedContainerIds,
