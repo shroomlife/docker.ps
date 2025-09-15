@@ -18,9 +18,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     cookieSecret: process.env.NUXT_COOKIE_SECRET ?? '',
     jwtSecret: process.env.NUXT_JWT_SECRET ?? '',
-    app: {
-      secretKey: process.env.NUXT_APP_SECRET_KEY || '',
-    },
+    secretKey: process.env.NUXT_SECRET_KEY || '',
     public: {
       appVersion: version,
       appUrl: process.env.NUXT_PUBLIC_APP_URL || 'http://localhost:3000',

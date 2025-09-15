@@ -11,7 +11,7 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): P
 
   try {
     const runtimeConfig = useRuntimeConfig()
-    const decodedCookieData = jwt.verify(cookieData, runtimeConfig.jwt.secret) as UserCookiePayload
+    const decodedCookieData = jwt.verify(cookieData, runtimeConfig.jwtSecret) as UserCookiePayload
     const foundUser = await prismaClient.user.findUnique({
       where: {
         uuid: decodedCookieData.userId,
