@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 const userStore = useUserStore()
 const isLoading = ref<boolean>(false)
+const isDisabled = ref<boolean>(true)
 
 const handleLogin = async () => {
   try {
@@ -9,11 +10,13 @@ const handleLogin = async () => {
   }
   catch (error) {
     console.error('Login error:', error)
-  }
-  finally {
     isLoading.value = false
   }
 }
+
+onMounted(() => {
+  isDisabled.value = false
+})
 </script>
 
 <template>
@@ -24,6 +27,7 @@ const handleLogin = async () => {
     size="xl"
     variant="soft"
     :loading="isLoading"
+    :disabled="isDisabled"
     @click="handleLogin"
   >
     Continue with Google

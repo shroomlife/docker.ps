@@ -17,9 +17,6 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): P
         uuid: decodedCookieData.userId,
         AND: { identities: { some: { uuid: decodedCookieData.identityId } } },
       },
-      include: {
-        identities: true,
-      },
     })
 
     if (!foundUser) {

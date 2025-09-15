@@ -11,10 +11,27 @@ const navigationItems: ComputedRef<NavigationMenuItem[]> = computed(() => {
   const route = useRoute()
   return [
     {
+      label: 'Dashboard',
+      icon: 'tabler:home',
+      to: '/dashboard',
+      active: route.path.startsWith('/dashboard'),
+    },
+    {
       label: 'Containers',
       icon: 'tabler:stack-2',
       to: '/containers',
       active: route.path.startsWith('/containers'),
+    },
+  ]
+})
+
+const bottomNavigationItems = computed<NavigationMenuItem[]>(() => {
+  return [
+    {
+      label: 'Logout',
+      icon: 'tabler:logout',
+      to: '/auth/logout',
+      active: false,
     },
   ]
 })
@@ -37,14 +54,29 @@ onBeforeMount(async () => {
   <UDashboardGroup>
     <UDashboardSidebar :ui="{ footer: 'border-t border-default', header: 'border-b border-default' }">
       <template #header>
-        <MainLogo />
+        <MainLogo to="/dashboard" />
       </template>
 
       <template #default>
-        <UNavigationMenu
-          :items="navigationItems"
-          orientation="vertical"
-        />
+        <div class="flex flex-col justify-between h-full w-full">
+          <UNavigationMenu
+            :items="navigationItems"
+            orientation="vertical"
+            :ui="{
+              link: 'text-base',
+              linkLeadingIcon: 'w-6 h-6',
+            }"
+          />
+
+          <UNavigationMenu
+            :items="bottomNavigationItems"
+            orientation="vertical"
+            :ui="{
+              link: 'text-base',
+              linkLeadingIcon: 'w-6 h-6',
+            }"
+          />
+        </div>
       </template>
 
       <template #footer>

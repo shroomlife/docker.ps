@@ -43,6 +43,12 @@ export const useUserStore = defineStore('UserStore', {
         throw error
       }
     },
+    logout() {
+      this.currentUser = null
+      const userCookie = useCookie(AuthSettings.cookie.name, AuthSettings.cookie.options)
+      userCookie.value = null
+      navigateTo('/auth/login')
+    },
   },
   getters: {
     getIsInitialized: state => state.isInitialized,
