@@ -2,6 +2,7 @@
 import type { NavigationMenuItem } from '@nuxt/ui'
 
 const userStore = useUserStore()
+const router = useRouter()
 
 const runtimeConfig = useRuntimeConfig()
 const appVersion = runtimeConfig.public.appVersion || '0.0.0'
@@ -18,29 +19,25 @@ const navigationItems: ComputedRef<NavigationMenuItem[]> = computed(() => {
   ]
 })
 
-onMounted(() => {
-  if (!userStore.isLoggedIn) {
+router.beforeEach((to) => {
+  if (userStore.getIsInitialized && !userStore.getIsLoggedIn && to.path.startsWith('/auth') === false) {
+    return navigateTo('/auth/login')
+  }
+})
+
+onBeforeMount(async () => {
+  await userStore.initialize()
+  if (!userStore.getIsLoggedIn) {
     navigateTo('/auth/login')
   }
 })
 </script>
 
 <template>
-  <UDashboardGroup
-    v-if="userStore.isLoggedIn"
-  >
+  <UDashboardGroup>
     <UDashboardSidebar :ui="{ footer: 'border-t border-default', header: 'border-b border-default' }">
       <template #header>
-        <NuxtLink
-          class="flex justify-start items-center gap-2 hover:opacity-80"
-          to="/"
-        >
-          <MainIcon
-            :width="32"
-            :height="32"
-          />
-          <span class="text-lg font-bold">docker.ps</span>
-        </NuxtLink>
+        <MainLogo />
       </template>
 
       <template #default>
@@ -52,10 +49,11 @@ onMounted(() => {
 
       <template #footer>
         <div class="flex justify-between items-center w-full">
-          <span>docker.ps</span>
+          <span class="font-bold">docker.ps</span>
           <UBadge
             variant="soft"
             color="neutral"
+            size="lg"
           >
             v{{ appVersion }}
           </UBadge>
@@ -63,7 +61,11 @@ onMounted(() => {
       </template>
     </UDashboardSidebar>
 
-    <slot />
+    <template v-if="userStore.getIsInitialized">
+      <slot v-if="userStore.getIsLoggedIn" />
+      <LoginBlocker v-else />
+    </template>
+    <LoadingBlocker v-else />
   </UDashboardGroup>
 </template>
 

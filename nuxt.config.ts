@@ -23,6 +23,7 @@ export default defineNuxtConfig({
     },
     public: {
       appVersion: version,
+      appUrl: process.env.NUXT_PUBLIC_APP_URL || 'http://localhost:3000',
       environment: process.env.NUXT_PUBLIC_ENVIRONMENT || 'local',
     },
     google: {

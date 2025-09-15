@@ -27,9 +27,16 @@ model UserIdentity {
   id         Int              @id @default(autoincrement())
   uuid       String           @unique @default(uuid())
   type       UserIdentityType
-  externalId String
+  externalId String?
+
+  username  String?          @db.VarChar(255)
+  password  String?
+
   user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId     Int
+
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
 
   @@unique([type, externalId])  // pro Provider eindeutig
   @@unique([userId, type])      // pro User nur eine Identität je Provider

@@ -19,7 +19,7 @@ const handleLogin = async () => {
 <template>
   <UButton
     block
-    icon="i-simple-icons-google"
+    icon="material-icon-theme:google"
     color="neutral"
     size="xl"
     variant="soft"
