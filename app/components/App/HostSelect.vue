@@ -7,9 +7,10 @@ const selectableHosts: ComputedRef<DropdownMenuItem[][]> = computed(() => {
   return [[
     ...dockerStore.availableHosts.map(host => ({
       label: host.name,
-      icon: 'i-lucide-server',
+      icon: 'tabler:stack-filled',
       onSelect: async () => {
         await dockerStore.setCurrentHost(host.uuid)
+        dockerStore.loadContainers()
         navigateTo('/containers')
       },
     }))], [
@@ -53,13 +54,31 @@ const computedLabel = computed(() => {
     <UButton
       color="neutral"
       :label="computedLabel"
-      variant="ghost"
+      variant="subtle"
       trailing-icon="i-lucide-chevrons-up-down"
+      :avatar="{
+        icon: 'tabler:stack-filled',
+        size: 'lg',
+      }"
       block
-      class="data-[state=open]:bg-elevated"
+      class="data-[state=open]:bg-elevated h-16"
       :ui="{
         trailingIcon: 'text-dimmed',
       }"
-    />
+    >
+      <template v-if="dockerStore.getCurrentHost">
+        <div class="flex flex-col items-start">
+          <div class="truncate font-semibold text-primary text-base max-w-44 md:max-w-40">
+            {{ dockerStore.getCurrentHost.name }}
+          </div>
+          <div class="text-xs truncate text-dimmed max-w-44 md:max-w-40">
+            {{ dockerStore.getCurrentHost.url }}
+          </div>
+        </div>
+      </template>
+      <template v-else>
+        <span class="text-dimmed">Select Docker Host</span>
+      </template>
+    </UButton>
   </UDropdownMenu>
 </template>

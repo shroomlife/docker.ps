@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import * as v from 'valibot'
 import type { FormSubmitEvent } from '@nuxt/ui'
+import type { DockerHost } from '@prisma/client'
 
 const dockerStore = useDockerStore()
 
@@ -25,10 +26,10 @@ const state = reactive({
 const toast = useToast()
 async function onSubmit(event: FormSubmitEvent<Schema>) {
   try {
-    await dockerStore.addHost(event.data.name, event.data.url, event.data.authKey)
+    await dockerStore.updateHost(dockerStore.getCurrentHost?.uuid, event.data.name, event.data.url, event.data.authKey)
     toast.add({
-      title: 'Added',
-      description: 'The Docker Host has been added successfully.',
+      title: 'Updated',
+      description: 'The Docker Host has been updated successfully.',
       color: 'success',
     })
     navigateTo('/hosts')
@@ -45,20 +46,32 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
 
 const breadcrumbItems = ref([
   {
-    label: 'Docker Hosts',
+    label: dockerStore.getCurrentHost?.name || 'Docker Host',
     icon: 'tabler:stack-front',
-    to: '/hosts',
+    to: '/containers',
   },
   {
-    label: 'Add Docker Host',
-    icon: 'tabler:square-rounded-plus',
+    label: 'Edit Docker Host',
+    icon: 'tabler:edit',
   },
 ])
+
+onMounted(async () => {
+  const currentHost = await $fetch<DockerHost>('/api/hosts', {
+    method: 'POST',
+    body: {
+      hostUuid: dockerStore.getCurrentHost?.uuid,
+    } as DockerHostGetRequest,
+  })
+  state.name = currentHost.name
+  state.url = currentHost.url
+  state.authKey = currentHost.authKey
+})
 </script>
 
 <template>
   <AppDashboardPage
-    title="Add Docker Host"
+    title="Edit Docker Host"
     headline="Docker Host"
   >
     <template #header>
@@ -111,8 +124,8 @@ const breadcrumbItems = ref([
       <UButton
         size="xl"
         type="submit"
-        icon="tabler:square-rounded-plus"
-        label="Add"
+        icon="tabler:check"
+        label="Save"
       />
     </UForm>
   </AppDashboardPage>

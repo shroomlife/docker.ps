@@ -29,7 +29,7 @@ model UserIdentity {
   type       UserIdentityType
   externalId String?
 
-  username String? @db.VarChar(255)
+  email    String? @db.VarChar(255)
   password String?
 
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)

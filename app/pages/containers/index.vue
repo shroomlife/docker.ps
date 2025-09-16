@@ -97,17 +97,77 @@ const computedContainers = computed(() => {
   )
 })
 
-onMounted(() => {
-  dockerStore.initialize()
+const breadcrumbItems = computed(() => {
+  return [
+    {
+      label: dockerStore.getCurrentHost?.name || '',
+      icon: 'tabler:stack',
+    },
+  ]
+})
+
+const computedImageSplit = computed(() => {
+  return (image: string) => {
+    return String(image).split(':')
+  }
+})
+
+const computedImageName = computed(() => {
+  return (image: string) => {
+    return computedImageSplit.value(image)[0]
+  }
+})
+
+const computedImageTag = computed(() => {
+  return (image: string) => {
+    // check if there is a tag
+    const split = computedImageSplit.value(image)
+    if (split.length > 1) {
+      return split[1]
+    }
+    return null
+  }
+})
+
+const computedEditDockerHostLink = computed(() => {
+  return dockerStore.getCurrentHost ? `/hosts/${dockerStore.getCurrentHost.uuid}/edit` : '/hosts'
+})
+
+onMounted(async () => {
+  if (!dockerStore.getHasCurrentHost) {
+    return navigateTo('/hosts')
+  }
+  await dockerStore.initialize()
+  // watch(() => dockerStore.getCurrentHost, async (newHost, oldHost) => {
+  //   if (newHost?.uuid !== oldHost?.uuid) {
+  //     await dockerStore.initialize()
+  //   }
+  // })
 })
 </script>
 
 <template>
   <AppDashboardPage
-    :headline="dockerStore.getCurrentHost?.name"
+    v-if="dockerStore.getCurrentHost"
+    :headline="dockerStore.getCurrentHost.name"
     title="Containers"
-    description="List of all running Docker containers."
+    description="List of all Docker containers"
   >
+    <template #header>
+      <UDashboardNavbar>
+        <template #left>
+          <UBreadcrumb :items="breadcrumbItems" />
+        </template>
+        <template #right>
+          <UButton
+            icon="tabler:edit"
+            :to="computedEditDockerHostLink"
+          >
+            Edit Host
+          </UButton>
+        </template>
+      </UDashboardNavbar>
+    </template>
     <div class="flex flex-col flex-1 w-full">
       <div class="flex justify-between px-4 py-3.5 border border-accented flex-wrap gap-4">
         <div class="flex gap-2 items-center font-medium flex-wrap">
@@ -162,14 +222,15 @@ onMounted(() => {
               color="info"
               size="lg"
             >
-              {{ String(row.original.image).split(':')[0] }}
+              {{ computedImageName(row.original.image) }}
             </UBadge>
             <UBadge
+              v-if="computedImageTag(row.original.image)"
               variant="outline"
               color="info"
               size="lg"
             >
-              {{ String(row.original.image).split(':')[1] }}
+              {{ computedImageTag(row.original.image) }}
             </UBadge>
           </div>
         </template>

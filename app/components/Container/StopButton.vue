@@ -1,5 +1,7 @@
 <script lang="ts" setup>
 const dockerStore = useDockerStore()
+const toast = useToast()
+
 const { id } = defineProps({
   id: {
     type: String as PropType<string>,
@@ -16,12 +18,20 @@ const stopContainer = async () => {
   try {
     const stoppedContainer = await $fetch<DockerStoreContainer>('/api/containers/stop', {
       method: 'POST',
-      body: { id } as DockerContainerStopRequest,
+      body: {
+        hostUuid: dockerStore.getCurrentHost?.uuid,
+        containerId: id,
+      } as DockerContainerStopRequest,
     })
     dockerStore.updateContainer(stoppedContainer)
   }
   catch (error) {
     console.error('Failed to stop container:', error)
+    toast.add({
+      title: 'Error',
+      description: 'Failed to stop container. Please try again.',
+      color: 'error',
+    })
   }
   finally {
     dockerStore.removeBlockedContainer(id)

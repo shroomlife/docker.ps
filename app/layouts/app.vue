@@ -1,6 +1,4 @@
 <script lang="ts" setup>
-import type { NavigationMenuItem } from '@nuxt/ui'
-
 const userStore = useUserStore()
 const dockerStore = useDockerStore()
 const router = useRouter()
@@ -12,40 +10,9 @@ if (!userStore.hasAuthCookie()) {
   await navigateTo('/login')
 }
 
-const navigationItems: ComputedRef<NavigationMenuItem[]> = computed(() => {
-  const route = useRoute()
-  return [
-    {
-      label: 'Dashboard',
-      icon: 'tabler:home',
-      to: '/dashboard',
-      active: route.path.startsWith('/dashboard'),
-    },
-  ]
-})
-
-const hostNavigationItems: ComputedRef<NavigationMenuItem[]> = computed(() => {
-  const route = useRoute()
-  return [
-    {
-      label: 'Containers',
-      icon: 'tabler:stack-2',
-      to: '/containers',
-      active: route.path.startsWith('/containers'),
-    },
-  ]
-})
-
-const bottomNavigationItems = computed<NavigationMenuItem[]>(() => {
-  return [
-    {
-      label: 'Logout',
-      icon: 'tabler:logout',
-      to: '/auth/logout',
-      active: false,
-    },
-  ]
-})
+const appTopNavigation = useAppTopNavigation()
+const appMainNavigation = useAppMainNavigation()
+const appFooterNavigation = useAppFooterNavigation()
 
 router.beforeEach((to) => {
   if (userStore.getIsInitialized && !userStore.getIsLoggedIn && to.path.startsWith('/login') === false) {
@@ -63,16 +30,22 @@ onBeforeMount(async () => {
 
 <template>
   <UDashboardGroup>
-    <UDashboardSidebar :ui="{ footer: 'border-t border-default', header: 'border-b border-default' }">
+    <UDashboardSidebar
+      class="min-w-80"
+      :ui="{ footer: 'border-t border-default', header: 'border-b border-default' }"
+    >
       <template #header>
-        <MainLogo to="/dashboard" />
+        <MainLogo
+          class="w-full"
+          to="/hosts"
+        />
       </template>
 
       <template #default>
         <div class="flex flex-col justify-between h-full w-full">
           <div class="flex flex-col justify-start gap-2">
             <UNavigationMenu
-              :items="navigationItems"
+              :items="appTopNavigation"
               orientation="vertical"
               :ui="{
                 link: 'text-base',
@@ -80,11 +53,13 @@ onBeforeMount(async () => {
               }"
             />
 
+            <USeparator />
+
             <AppHostSelect />
 
             <UNavigationMenu
               v-if="dockerStore.getHasCurrentHost"
-              :items="hostNavigationItems"
+              :items="appMainNavigation"
               orientation="vertical"
               :ui="{
                 link: 'text-base',
@@ -94,7 +69,7 @@ onBeforeMount(async () => {
           </div>
 
           <UNavigationMenu
-            :items="bottomNavigationItems"
+            :items="appFooterNavigation"
             orientation="vertical"
             :ui="{
               link: 'text-base',

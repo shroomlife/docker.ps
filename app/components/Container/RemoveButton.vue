@@ -1,5 +1,7 @@
 <script lang="ts" setup>
 const dockerStore = useDockerStore()
+const toast = useToast()
+
 const { id } = defineProps({
   id: {
     type: String as PropType<string>,
@@ -16,7 +18,10 @@ const removeContainer = async () => {
   try {
     const isRemoved = await $fetch<DockerStoreContainer>('/api/containers/remove', {
       method: 'POST',
-      body: { id } as DockerContainerRemoveRequest,
+      body: {
+        hostUuid: dockerStore.getCurrentHost?.uuid,
+        containerId: id,
+      } as DockerContainerRemoveRequest,
     })
     if (isRemoved) {
       dockerStore.removeContainer(id)
@@ -24,6 +29,11 @@ const removeContainer = async () => {
   }
   catch (error) {
     console.error('Failed to stop container:', error)
+    toast.add({
+      title: 'Error',
+      description: 'Failed to remove container. Please try again.',
+      color: 'error',
+    })
   }
   finally {
     dockerStore.removeBlockedContainer(id)

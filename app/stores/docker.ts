@@ -27,27 +27,75 @@ export const useDockerStore = defineStore('DockerStore', {
         this.currentHost = newHost
       }
     },
+
+    async updateHost(uuid: string | undefined, name: string, url: string, authKey: string) {
+      if (!uuid) {
+        throw new Error('Host UUID is required for update')
+      }
+      const updatedHost = await $fetch<DockerHost>(`/api/hosts/edit`, {
+        method: 'POST',
+        body: {
+          uuid,
+          name,
+          url,
+          authKey,
+        } as DockerHostEditRequestBody,
+      })
+      const index = this.availableHosts.findIndex(host => host.uuid === uuid)
+      if (index !== -1) {
+        this.availableHosts[index] = updatedHost
+        if (this.currentHost?.uuid === uuid) {
+          this.currentHost = updatedHost
+        }
+      }
+    },
+
     addHosts(hosts: DockerHost[]) {
       this.availableHosts = hosts
+      this.loadCurrentHostFromSession()
+    },
+
+    resetHostData() {
+      this.containers = []
+      this.initialized = false
     },
 
     async setCurrentHost(uuid: string) {
+      if (this.getCurrentHost?.uuid === uuid) return
       const foundHost = this.availableHosts.find(host => host.uuid === uuid)
       if (foundHost) {
+        this.resetHostData()
         this.currentHost = foundHost
+        sessionStorage.setItem('dockerCurrentHostUuid', uuid)
         return
       }
       throw new Error('Host Not Found')
     },
 
+    loadCurrentHostFromSession() {
+      const storedUuid = sessionStorage.getItem('dockerCurrentHostUuid')
+      if (storedUuid) {
+        const foundHost = this.availableHosts.find(host => host.uuid === storedUuid)
+        if (foundHost) {
+          this.currentHost = foundHost
+        }
+      }
+    },
+
     async initialize() {
+      if (!this.getHasCurrentHost) return
       await this.loadContainers()
       this.initialized = true
     },
     async loadContainers() {
       try {
         this.isLoadingContainers = true
-        this.containers = await $fetch<DockerStoreContainer[]>('/api/containers/list')
+        this.containers = await $fetch<DockerStoreContainer[]>('/api/containers/list', {
+          method: 'POST',
+          body: {
+            hostUuid: this.getCurrentHost?.uuid,
+          } as DockerContainerListRequest,
+        })
       }
       catch (error) {
         console.error('Failed to initialize DockerStore:', error)

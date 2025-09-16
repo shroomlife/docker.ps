@@ -36,7 +36,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <UMain class="min-h-screen flex flex-col justify-start">
+  <UMain class="min-h-dvh flex flex-col justify-start">
     <UHeader>
       <template #left>
         <MainLogo to="/" />
@@ -54,7 +54,7 @@ onMounted(() => {
           v-else
           label="Dashboard"
           color="primary"
-          to="/dashboard"
+          to="/hosts"
         />
       </template>
 

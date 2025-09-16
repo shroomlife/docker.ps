@@ -26,31 +26,57 @@ export interface DockerStoreContainer {
 }
 
 export interface DockerContainerRestartRequest {
-  id: string
+  hostUuid: string
+  containerId: string
 }
 
 export interface DockerContainerPauseRequest {
-  id: string
+  hostUuid: string
+  containerId: string
 }
 
 export interface DockerContainerStopRequest {
-  id: string
+  hostUuid: string
+  containerId: string
 }
 
 export interface DockerContainerUnpauseRequest {
-  id: string
+  hostUuid: string
+  containerId: string
 }
 
 export interface DockerContainerStartRequest {
-  id: string
+  hostUuid: string
+  containerId: string
 }
 
 export interface DockerContainerRemoveRequest {
-  id: string
+  hostUuid: string
+  containerId: string
 }
 
 export interface DockerHostAddRequestBody {
   name: string
   url: string
   authKey: string
+}
+
+export interface DockerHostEditRequestBody {
+  uuid: string
+  name: string
+  url: string
+  authKey: string
+}
+
+export interface DockerHostGetRequest {
+  hostUuid: string
+}
+
+export interface DockerContainerListRequest {
+  hostUuid: string
+}
+
+export interface DockerContainerGetRequest {
+  hostUuid: string
+  containerId: string
 }

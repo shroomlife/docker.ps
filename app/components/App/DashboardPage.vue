@@ -17,10 +17,10 @@ const { title } = defineProps({
 
 <template>
   <UDashboardPanel>
-    <template
-      #header
-    >
-      <UDashboardNavbar class="lg:hidden" />
+    <template #header>
+      <slot name="header">
+        <UDashboardNavbar class="lg:hidden" />
+      </slot>
     </template>
     <template #body>
       <UPage>

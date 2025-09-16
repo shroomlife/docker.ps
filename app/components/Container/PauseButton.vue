@@ -1,5 +1,7 @@
 <script lang="ts" setup>
 const dockerStore = useDockerStore()
+const toast = useToast()
+
 const { id } = defineProps({
   id: {
     type: String as PropType<string>,
@@ -16,12 +18,20 @@ const pauseContainer = async () => {
   try {
     const pausedContainer = await $fetch<DockerStoreContainer>('/api/containers/pause', {
       method: 'POST',
-      body: { id } as DockerContainerPauseRequest,
+      body: {
+        hostUuid: dockerStore.getCurrentHost?.uuid,
+        containerId: id,
+      } as DockerContainerPauseRequest,
     })
     dockerStore.updateContainer(pausedContainer)
   }
   catch (error) {
     console.error('Failed to pause container:', error)
+    toast.add({
+      title: 'Error',
+      description: 'Failed to pause container. Please try again.',
+      color: 'error',
+    })
   }
   finally {
     dockerStore.removeBlockedContainer(id)

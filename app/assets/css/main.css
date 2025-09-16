@@ -1,6 +1,15 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
 
+@theme {
+  --color-red: #E4312B;
+  --color-green: #149954;
+
+  --ui-primary: var(--color-green);
+  --ui-error: var(--color-red);
+
+}
+
 body {
   font-family: "Nata Sans", sans-serif;
 }

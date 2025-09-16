@@ -1,8 +1,28 @@
+import axios from 'axios'
+import type { ContainerInspectInfo } from 'dockerode'
+
 export default defineEventHandler(async (event): Promise<DockerStoreContainer> => {
-  const body = await readBody(event) as DockerContainerUnpauseRequest
-  const docker = DockerService.getDockerHost()
-  const container = docker.getContainer(body.id)
-  await container.start()
-  const containerInfo = await container.inspect()
-  return DockerService.simplifyContainerInspect(containerInfo)
+  const user = await AuthService.getUserOrFail(event)
+  const body = await readBody(event) as DockerContainerStartRequest
+
+  const dockerHost = await prismaClient.dockerHost.findUniqueOrThrow({
+    where: {
+      uuid: body.hostUuid,
+      userId: user.id,
+    },
+  })
+
+  if (!dockerHost) {
+    throw createError({ statusCode: 404, statusMessage: 'Docker Host Not Found' })
+  }
+
+  const startedDockerContainer = await axios<ContainerInspectInfo>({
+    method: 'GET',
+    url: new URL(`/containers/${body.containerId}/start`, dockerHost.url).toString(),
+    headers: {
+      'x-auth-key': dockerHost.authKey,
+    },
+  })
+
+  return DockerService.simplifyContainerInspect(startedDockerContainer.data)
 })

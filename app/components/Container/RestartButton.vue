@@ -1,5 +1,7 @@
 <script lang="ts" setup>
 const dockerStore = useDockerStore()
+const toast = useToast()
+
 const { id } = defineProps({
   id: {
     type: String as PropType<string>,
@@ -16,12 +18,20 @@ const restartContainer = async () => {
   try {
     const restartedContainer = await $fetch<DockerStoreContainer>('/api/containers/restart', {
       method: 'POST',
-      body: { id } as DockerContainerRestartRequest,
+      body: {
+        hostUuid: dockerStore.getCurrentHost?.uuid,
+        containerId: id,
+      } as DockerContainerRestartRequest,
     })
     dockerStore.updateContainer(restartedContainer)
   }
   catch (error) {
     console.error('Failed to restart container:', error)
+    toast.add({
+      title: 'Error',
+      description: 'Failed to restart container. Please try again.',
+      color: 'error',
+    })
   }
   finally {
     dockerStore.removeBlockedContainer(id)
