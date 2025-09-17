@@ -6,6 +6,7 @@
   --color-green: #149954;
 
   --ui-primary: var(--color-green);
+  --ui-success: var(--color-green);
   --ui-error: var(--color-red);
 
 }
