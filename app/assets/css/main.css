@@ -15,6 +15,10 @@ body {
   font-family: "Nata Sans", sans-serif;
 }
 
+button {
+  cursor: pointer;
+}
+
 .login-background {
   background-image: url("~/assets/images/bg-login.avif");
   background-size: cover;

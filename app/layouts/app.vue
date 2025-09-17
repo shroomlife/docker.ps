@@ -23,7 +23,12 @@ router.beforeEach((to) => {
 
 appStore.addLoader('userStore/initialize')
 onMounted(async () => {
-  await userStore.initialize()
+  if (userStore.getIsInitialized === false) {
+    await userStore.initialize()
+  }
+  else {
+    appStore.removeLoader('userStore/initialize')
+  }
   if (!userStore.getIsLoggedIn) {
     navigateTo('/profile/login')
   }

@@ -101,7 +101,7 @@ const breadcrumbItems = computed(() => {
   return [
     {
       label: dockerStore.getCurrentHost?.name || '',
-      icon: 'tabler:stack',
+      icon: 'tabler:stack-filled',
     },
   ]
 })
@@ -132,6 +132,13 @@ const computedImageTag = computed(() => {
 const computedEditDockerHostLink = computed(() => {
   return dockerStore.getCurrentHost ? `/app/hosts/${dockerStore.getCurrentHost.uuid}/edit` : '/app/hosts'
 })
+
+const tableSorting = ref([
+  {
+    id: 'name',
+    desc: false,
+  },
+])
 
 onMounted(async () => {
   if (!dockerStore.getHasCurrentHost) {
@@ -167,7 +174,7 @@ onMounted(async () => {
         <div class="flex gap-2 items-center font-medium flex-wrap">
           <UIcon
             size="24"
-            name="tabler:stack-2"
+            name="tabler:stack"
           />
           <span>{{ computedContainers.length }} Containers</span>
         </div>
@@ -191,6 +198,7 @@ onMounted(async () => {
       </div>
 
       <UTable
+        v-model:sorting="tableSorting"
         :loading="dockerStore.getIsLoadingContainers"
         :columns="columns"
         :data="computedContainers"
@@ -235,7 +243,7 @@ onMounted(async () => {
             variant="link"
             :to="`/app/containers/${row.original.id}`"
             size="xl"
-            icon="tabler:stack-filled"
+            icon="tabler:stack"
             color="info"
             :ui="{
               base: 'w-full',

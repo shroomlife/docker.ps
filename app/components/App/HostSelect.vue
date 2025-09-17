@@ -7,17 +7,18 @@ const selectableHosts: ComputedRef<DropdownMenuItem[][]> = computed(() => {
   return [[
     ...dockerStore.availableHosts.map(host => ({
       label: host.name,
+      description: host.url,
       icon: 'tabler:stack-filled',
       onSelect: async () => {
         await dockerStore.setCurrentHost(host.uuid)
-        dockerStore.loadContainers()
         navigateTo('/app/containers')
       },
+      active: dockerStore.getCurrentHost?.uuid === host.uuid,
     }))], [
     {
       label: 'Add Docker Host',
       icon: 'tabler:square-rounded-plus',
-      to: '/hosts/create',
+      to: '/app/hosts/create',
     }],
   ] as DropdownMenuItem[][]
 })
@@ -28,29 +29,23 @@ const computedLabel = computed(() => {
   }
   return 'Select Docker Host'
 })
-
-// const items = computed<DropdownMenuItem[][]>(() => {
-//   return [teams.value.map(team => ({
-//     ...team,
-//     onSelect() {
-//       selectedTeam.value = team
-//     },
-//   })), [{
-//     label: 'Create team',
-//     icon: 'i-lucide-circle-plus',
-//   }, {
-//     label: 'Manage teams',
-//     icon: 'i-lucide-cog',
-//   }]]
-// })
 </script>
 
 <template>
   <UDropdownMenu
     :items="selectableHosts"
     :content="{ align: 'center', collisionPadding: 12 }"
-    :ui="{ content: 'w-(--reka-dropdown-menu-trigger-width)' }"
+    :ui="{ content: 'w-(--reka-dropdown-menu-trigger-width)', item: 'text-base gap-3' }"
   >
+    <template #item-label="{ item }">
+      <div class="flex flex-col items-start">
+        <div>{{ item.label }}</div>
+        <div class="text-dimmed text-xs truncate">
+          {{ item.description }}
+        </div>
+      </div>
+    </template>
+
     <UButton
       color="neutral"
       :label="computedLabel"

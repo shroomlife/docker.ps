@@ -59,7 +59,6 @@ const breadcrumbItems = ref([
 <template>
   <AppDashboardPage
     title="Add Docker Host"
-    headline="Docker Host"
   >
     <template #header>
       <UDashboardNavbar>

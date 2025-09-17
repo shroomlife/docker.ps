@@ -17,7 +17,6 @@ const computedHosts = computed(() => {
       highlight: dockerStore.currentHost?.uuid === host.uuid,
       onClick: async () => {
         await dockerStore.setCurrentHost(host.uuid)
-        dockerStore.loadContainers()
         navigateTo('/app/containers')
       },
     } as PageCardProps),

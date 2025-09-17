@@ -8,6 +8,9 @@ export const useAppStore = defineStore('AppStore', {
     addLoader(loaderId: string) {
       if (!this.loaders.includes(loaderId)) {
         this.loaders.push(loaderId)
+        setTimeout(() => {
+          this.removeLoader(loaderId)
+        }, 10000) // Auto-remove loader after 10 seconds to prevent indefinite loading state
       }
     },
     removeLoader(loaderId: string) {

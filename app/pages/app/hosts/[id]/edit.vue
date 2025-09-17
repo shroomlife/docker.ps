@@ -72,7 +72,6 @@ onMounted(async () => {
 <template>
   <AppDashboardPage
     title="Edit Docker Host"
-    headline="Docker Host"
   >
     <template #header>
       <UDashboardNavbar>

@@ -62,8 +62,10 @@ export const useDockerStore = defineStore('DockerStore', {
       if (this.getCurrentHost?.uuid === uuid) return
       const foundHost = this.availableHosts.find(host => host.uuid === uuid)
       if (foundHost) {
+        if (this.currentHost?.uuid === foundHost.uuid) return
         this.resetHostData()
         this.currentHost = foundHost
+        this.loadContainers()
         sessionStorage.setItem('dockerCurrentHostUuid', uuid)
         return
       }
