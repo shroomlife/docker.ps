@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-navigateTo('/login')
+navigateTo('/profile/login')
 </script>
 
 <template>
@@ -13,7 +13,7 @@ navigateTo('/login')
       <div class="w-full h-full bg-gray-100 rounded-lg flex justify-center items-center">
         <UButton
           label="Zum Login"
-          to="/login"
+          to="/profile/login"
           size="xl"
         />
       </div>

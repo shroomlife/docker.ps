@@ -18,7 +18,7 @@ onMounted(() => {
     icon: 'tabler:logout',
   })
   setTimeout(() => {
-    navigateTo('/login')
+    navigateTo('/profile/login')
   }, 2000)
 })
 </script>

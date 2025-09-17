@@ -20,13 +20,13 @@ const headerItems: NavigationMenuItem[] = [
 const footerItems: NavigationMenuItem[] = [
   {
     label: 'Privacy Policy',
-    to: '/privacy-policy',
-    active: route.path.startsWith('/privacy-policy'),
+    to: '/legal/privacy',
+    active: route.path.startsWith('/legal/privacy'),
   },
   {
     label: 'Imprint',
-    to: '/imprint',
-    active: route.path.startsWith('/imprint'),
+    to: '/legal/imprint',
+    active: route.path.startsWith('/legal/imprint'),
   },
 ]
 
@@ -48,7 +48,7 @@ onMounted(() => {
           label="Login"
           color="neutral"
           variant="outline"
-          to="/login"
+          to="/profile/login"
         />
         <UButton
           v-else

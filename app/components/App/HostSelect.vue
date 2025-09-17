@@ -11,7 +11,7 @@ const selectableHosts: ComputedRef<DropdownMenuItem[][]> = computed(() => {
       onSelect: async () => {
         await dockerStore.setCurrentHost(host.uuid)
         dockerStore.loadContainers()
-        navigateTo('/containers')
+        navigateTo('/app/containers')
       },
     }))], [
     {

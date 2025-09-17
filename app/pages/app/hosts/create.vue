@@ -31,7 +31,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       description: 'The Docker Host has been added successfully.',
       color: 'success',
     })
-    navigateTo('/app/hosts')
+    navigateTo('/app')
   }
   catch (error) {
     console.error('Failed to add Docker host:', error)
@@ -47,7 +47,7 @@ const breadcrumbItems = ref([
   {
     label: 'Docker Hosts',
     icon: 'tabler:stack-front',
-    to: '/app/hosts',
+    to: '/app',
   },
   {
     label: 'Add Docker Host',
@@ -104,7 +104,7 @@ const breadcrumbItems = ref([
         <UInput
           v-model="state.authKey"
           class="w-full"
-          placeholder="docker_ps_"
+          type="password"
         />
       </UFormField>
 

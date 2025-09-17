@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+const appStore = useAppStore()
 const userStore = useUserStore()
 const dockerStore = useDockerStore()
 const router = useRouter()
@@ -7,7 +8,7 @@ const runtimeConfig = useRuntimeConfig()
 const appVersion = runtimeConfig.public.appVersion || '0.0.0'
 
 if (!userStore.hasAuthCookie()) {
-  await navigateTo('/login')
+  await navigateTo('/profile/login')
 }
 
 const appTopNavigation = useAppTopNavigation()
@@ -15,15 +16,16 @@ const appMainNavigation = useAppMainNavigation()
 const appFooterNavigation = useAppFooterNavigation()
 
 router.beforeEach((to) => {
-  if (userStore.getIsInitialized && !userStore.getIsLoggedIn && to.path.startsWith('/login') === false) {
-    return navigateTo('/login')
+  if (userStore.getIsInitialized && !userStore.getIsLoggedIn && to.path.startsWith('/profile/login') === false) {
+    return navigateTo('/profile/login')
   }
 })
 
-onBeforeMount(async () => {
+appStore.addLoader('userStore/initialize')
+onMounted(async () => {
   await userStore.initialize()
   if (!userStore.getIsLoggedIn) {
-    navigateTo('/login')
+    navigateTo('/profile/login')
   }
 })
 </script>
@@ -37,7 +39,7 @@ onBeforeMount(async () => {
       <template #header>
         <MainLogo
           class="w-full"
-          to="/app/hosts"
+          to="/app"
         />
       </template>
 

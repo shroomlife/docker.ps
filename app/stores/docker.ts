@@ -6,7 +6,6 @@ export const useDockerStore = defineStore('DockerStore', {
     return {
       currentHost: null,
       availableHosts: [],
-      initialized: false,
       isLoadingContainers: false,
       containers: [],
       blockedContainerIds: [],
@@ -57,7 +56,6 @@ export const useDockerStore = defineStore('DockerStore', {
 
     resetHostData() {
       this.containers = []
-      this.initialized = false
     },
 
     async setCurrentHost(uuid: string) {
@@ -82,13 +80,11 @@ export const useDockerStore = defineStore('DockerStore', {
       }
     },
 
-    async initialize() {
-      if (!this.getHasCurrentHost) return
-      await this.loadContainers()
-      this.initialized = true
-    },
     async loadContainers() {
+      if (!this.getHasCurrentHost) return
+      const appStore = useAppStore()
       try {
+        appStore.addLoader('dockerStore/loadContainers')
         this.isLoadingContainers = true
         this.containers = await $fetch<DockerStoreContainer[]>('/api/containers/list', {
           method: 'POST',
@@ -108,6 +104,7 @@ export const useDockerStore = defineStore('DockerStore', {
       }
       finally {
         this.isLoadingContainers = false
+        appStore.removeLoader('dockerStore/loadContainers')
       }
     },
     addBlockedContainer(id: string) {
@@ -133,7 +130,6 @@ export const useDockerStore = defineStore('DockerStore', {
     getCurrentHost: state => state.currentHost,
     getHasCurrentHost: state => !!state.currentHost,
     getAvailableHosts: state => state.availableHosts,
-    isInitialized: state => state.initialized,
     getContainers: state => state.containers,
     getBlockedContainerIds: state => state.blockedContainerIds,
     getIsLoadingContainers: state => state.isLoadingContainers,

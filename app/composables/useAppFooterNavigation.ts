@@ -13,8 +13,8 @@ export const useAppFooterNavigation = (): ComputedRef<NavigationMenuItem[]> => {
       {
         label: 'Logout',
         icon: 'tabler:logout',
-        to: '/auth/logout',
-        active: route.path.startsWith('/auth/logout'),
+        to: '/profile/logout',
+        active: route.path.startsWith('/profile/logout'),
       },
     ]
   })

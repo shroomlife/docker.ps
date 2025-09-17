@@ -135,21 +135,15 @@ const computedEditDockerHostLink = computed(() => {
 
 onMounted(async () => {
   if (!dockerStore.getHasCurrentHost) {
-    return navigateTo('/app/hosts')
+    return navigateTo('/app')
   }
-  await dockerStore.initialize()
-  // watch(() => dockerStore.getCurrentHost, async (newHost, oldHost) => {
-  //   if (newHost?.uuid !== oldHost?.uuid) {
-  //     await dockerStore.initialize()
-  //   }
-  // })
+  await dockerStore.loadContainers()
 })
 </script>
 
 <template>
   <AppDashboardPage
     v-if="dockerStore.getCurrentHost"
-    :headline="dockerStore.getCurrentHost.name"
     title="Containers"
     description="List of all Docker containers"
   >
@@ -239,7 +233,7 @@ onMounted(async () => {
           <UButton
             :label="row.original.name"
             variant="link"
-            :to="`/containers/${row.original.id}`"
+            :to="`/app/containers/${row.original.id}`"
             size="xl"
             icon="tabler:stack-filled"
             color="info"

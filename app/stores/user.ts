@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 
+const appStore = useAppStore()
 export const useUserStore = defineStore('UserStore', {
   state: (): UserStoreState => ({
     isInitialized: false,
@@ -12,6 +13,8 @@ export const useUserStore = defineStore('UserStore', {
     },
     async initialize() {
       if (this.isInitialized) return
+
+      appStore.addLoader('userStore/initialize')
       const userCookie = useCookie(AuthSettings.cookie.name, AuthSettings.cookie.options)
       if (userCookie.value) {
         try {
@@ -22,13 +25,9 @@ export const useUserStore = defineStore('UserStore', {
           console.error('Error verifying User Cookie:', error)
           this.currentUser = null
         }
-        finally {
-          this.isInitialized = true
-        }
       }
-      else {
-        this.isInitialized = true
-      }
+      this.isInitialized = true
+      appStore.removeLoader('userStore/initialize')
     },
     async loginWithGoogle() {
       const response = await $fetch<{ authUrl: string }>('/api/auth/google/login')

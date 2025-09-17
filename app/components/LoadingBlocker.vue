@@ -11,10 +11,10 @@
     </template>
     <template #body>
       <div class="w-full h-full bg-gray-100 rounded-lg flex justify-center items-center">
-        <UIcon
-          name="tabler:loader"
-          size="64"
-          class="animate-spin text-primary"
+        <MainIcon
+          :width="64"
+          :height="64"
+          class="animate-spin"
         />
       </div>
     </template>

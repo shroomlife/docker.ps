@@ -32,7 +32,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       description: 'The Docker Host has been updated successfully.',
       color: 'success',
     })
-    navigateTo('/app/hosts')
+    navigateTo('/app')
   }
   catch (error) {
     console.error('Failed to add Docker host:', error)
@@ -48,7 +48,7 @@ const breadcrumbItems = ref([
   {
     label: dockerStore.getCurrentHost?.name || 'Docker Host',
     icon: 'tabler:stack-front',
-    to: '/containers',
+    to: '/app/containers',
   },
   {
     label: 'Edit Docker Host',
@@ -117,7 +117,7 @@ onMounted(async () => {
         <UInput
           v-model="state.authKey"
           class="w-full"
-          placeholder="docker_ps_"
+          type="password"
         />
       </UFormField>
 

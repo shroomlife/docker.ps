@@ -3,7 +3,6 @@ import jwt from 'jsonwebtoken'
 
 export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): Promise<AppUser> => {
   const cookieData = getCookie(event, AuthSettings.cookie.name) as string | undefined
-
   if (!cookieData) {
     throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
   }

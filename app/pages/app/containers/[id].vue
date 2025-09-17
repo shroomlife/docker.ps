@@ -16,7 +16,7 @@ if (!currentRoute.params.id) {
     description: 'No Container provided',
     color: 'error',
   })
-  navigateTo('/containers')
+  navigateTo('/app/containers')
 }
 
 const container = ref<ContainerInspectInfo | null>(null)
@@ -29,7 +29,7 @@ const breadcrumbItems = computed(() => {
     {
       label: dockerStore.getCurrentHost?.name || '',
       icon: 'tabler:stack',
-      to: '/containers',
+      to: '/app/containers',
     },
     {
       label: computedTitle.value,
@@ -57,7 +57,7 @@ onMounted(async () => {
       description: 'Failed to fetch Container Details',
       color: 'error',
     })
-    navigateTo('/containers')
+    navigateTo('/app/containers')
   }
   finally {
     isLoading.value = false

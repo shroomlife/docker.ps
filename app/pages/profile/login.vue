@@ -19,7 +19,7 @@ onMounted(() => {
     <GoogleLoginButton />
     <div class="text-sm text-center text-muted">
       By registering or logging in, you agree to our <NuxtLink
-        to="/privacy-policy"
+        to="/legal/privacy"
         class="underline"
       >Privacy Policy</NuxtLink>.
     </div>

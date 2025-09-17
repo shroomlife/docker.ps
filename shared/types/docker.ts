@@ -3,7 +3,6 @@ import type { DockerHost } from '@prisma/client'
 export interface DockerStoreState {
   currentHost: DockerHost | null
   availableHosts: DockerHost[]
-  initialized: boolean
   isLoadingContainers: boolean
   containers: DockerStoreContainer[]
   blockedContainerIds: string[]
