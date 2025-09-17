@@ -130,12 +130,12 @@ const computedImageTag = computed(() => {
 })
 
 const computedEditDockerHostLink = computed(() => {
-  return dockerStore.getCurrentHost ? `/hosts/${dockerStore.getCurrentHost.uuid}/edit` : '/hosts'
+  return dockerStore.getCurrentHost ? `/app/hosts/${dockerStore.getCurrentHost.uuid}/edit` : '/app/hosts'
 })
 
 onMounted(async () => {
   if (!dockerStore.getHasCurrentHost) {
-    return navigateTo('/hosts')
+    return navigateTo('/app/hosts')
   }
   await dockerStore.initialize()
   // watch(() => dockerStore.getCurrentHost, async (newHost, oldHost) => {

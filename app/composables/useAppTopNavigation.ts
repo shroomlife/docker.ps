@@ -7,8 +7,8 @@ export const useAppTopNavigation = (): ComputedRef<NavigationMenuItem[]> => {
       {
         label: 'Docker Hosts',
         icon: 'tabler:stack-front',
-        to: '/hosts',
-        active: route.path.startsWith('/hosts'),
+        to: '/app',
+        active: route.path === '/app',
       },
     ]
   })

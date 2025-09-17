@@ -31,7 +31,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       description: 'The Docker Host has been added successfully.',
       color: 'success',
     })
-    navigateTo('/hosts')
+    navigateTo('/app/hosts')
   }
   catch (error) {
     console.error('Failed to add Docker host:', error)
@@ -47,7 +47,7 @@ const breadcrumbItems = ref([
   {
     label: 'Docker Hosts',
     icon: 'tabler:stack-front',
-    to: '/hosts',
+    to: '/app/hosts',
   },
   {
     label: 'Add Docker Host',

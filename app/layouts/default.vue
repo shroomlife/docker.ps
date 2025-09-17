@@ -52,9 +52,9 @@ onMounted(() => {
         />
         <UButton
           v-else
-          label="Dashboard"
+          label="Zur App"
           color="primary"
-          to="/hosts"
+          to="/app"
         />
       </template>
 

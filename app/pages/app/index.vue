@@ -18,7 +18,7 @@ const computedHosts = computed(() => {
       onClick: async () => {
         await dockerStore.setCurrentHost(host.uuid)
         dockerStore.loadContainers()
-        navigateTo('/containers')
+        navigateTo('/app/containers')
       },
     } as PageCardProps),
     ),
@@ -27,7 +27,7 @@ const computedHosts = computed(() => {
       variant: 'ghost',
       description: 'You can add a new Docker Host to manage your containers.',
       icon: 'tabler:square-rounded-plus',
-      to: '/hosts/create',
+      to: '/app/hosts/create',
     } as PageCardProps,
   ]
   // sort highlight always on top

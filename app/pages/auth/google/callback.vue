@@ -15,7 +15,7 @@ onMounted(async () => {
       throw new Error('Invalid Query Parameters')
     }
     await userStore.callbackLoginWithGoogle(String(code), String(state))
-    navigateTo('/hosts')
+    navigateTo('/app/hosts')
   }
   catch (error) {
     console.error('Google OAuth Callback Error:', error)

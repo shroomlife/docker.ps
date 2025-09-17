@@ -37,7 +37,7 @@ onBeforeMount(async () => {
       <template #header>
         <MainLogo
           class="w-full"
-          to="/hosts"
+          to="/app/hosts"
         />
       </template>
 

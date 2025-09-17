@@ -7,8 +7,8 @@ export const useAppMainNavigation = (): ComputedRef<NavigationMenuItem[]> => {
       {
         label: 'Containers',
         icon: 'tabler:stack',
-        to: '/containers',
-        active: route.path.startsWith('/containers'),
+        to: '/app/containers',
+        active: route.path.startsWith('/app/containers'),
       },
     ]
   })

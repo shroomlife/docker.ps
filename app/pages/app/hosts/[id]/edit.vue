@@ -32,7 +32,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       description: 'The Docker Host has been updated successfully.',
       color: 'success',
     })
-    navigateTo('/hosts')
+    navigateTo('/app/hosts')
   }
   catch (error) {
     console.error('Failed to add Docker host:', error)
