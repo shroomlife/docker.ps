@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 
-const appStore = useAppStore()
 export const useUserStore = defineStore('UserStore', {
   state: (): UserStoreState => ({
     isInitialized: false,
@@ -14,6 +13,7 @@ export const useUserStore = defineStore('UserStore', {
     async initialize() {
       if (this.isInitialized) return
 
+      const appStore = useAppStore()
       appStore.addLoader('userStore/initialize')
       const userCookie = useCookie(AuthSettings.cookie.name, AuthSettings.cookie.options)
       if (userCookie.value) {
