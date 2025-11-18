@@ -31,6 +31,7 @@ export default defineNuxtConfig({
       scope: process.env.NUXT_GOOGLE_SCOPE ?? 'openid',
     },
   },
+  ignore: ['apps/**'],
   compatibilityDate: '2025-07-15',
   nitro: {
     preset: 'bun',

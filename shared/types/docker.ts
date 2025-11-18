@@ -79,3 +79,10 @@ export interface DockerContainerGetRequest {
   hostUuid: string
   containerId: string
 }
+
+export interface DockerContainerLogsRequest {
+  hostUuid: string
+  containerId: string
+  follow?: boolean
+  tail?: number
+}

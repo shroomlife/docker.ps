@@ -253,34 +253,10 @@ onMounted(async () => {
         </template>
 
         <template #actions-cell="{ row }">
-          <div
-            class="flex gap-2 items-center"
-          >
-            <ContainerUnpauseButton
-              v-if="row.original.state === 'paused'"
-              :id="row.original.id"
-            />
-            <ContainerStartButton
-              v-if="row.original.state === 'exited'"
-              :id="row.original.id"
-            />
-            <ContainerPauseButton
-              v-if="row.original.state === 'running'"
-              :id="row.original.id"
-            />
-            <ContainerRestartButton
-              v-if="row.original.state !== 'exited'"
-              :id="row.original.id"
-            />
-            <ContainerStopButton
-              v-if="row.original.state !== 'exited'"
-              :id="row.original.id"
-            />
-            <ContainerRemoveButton
-              v-if="row.original.state === 'exited'"
-              :id="row.original.id"
-            />
-          </div>
+          <ContainerActionButtons
+            :id="row.original.id"
+            :state="row.original.state"
+          />
         </template>
       </UTable>
     </div>

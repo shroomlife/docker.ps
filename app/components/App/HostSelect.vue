@@ -37,9 +37,8 @@ const computedLabel = computed(() => {
     :content="{ align: 'center', collisionPadding: 12 }"
     :ui="{ content: 'w-(--reka-dropdown-menu-trigger-width)', item: 'text-base gap-3' }"
   >
-    <template #item-label="{ item }">
+    <template #item-description="{ item }">
       <div class="flex flex-col items-start">
-        <div>{{ item.label }}</div>
         <div class="text-dimmed text-xs truncate">
           {{ item.description }}
         </div>

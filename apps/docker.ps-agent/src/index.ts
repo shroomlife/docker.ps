@@ -140,6 +140,89 @@ try {
       return { message: `Container ${params.id} has been removed.` }
     })
 
+    // Route to Get Container Logs (with streaming support)
+    .get('/containers/:id/logs', async ({ params, query, set }) => {
+      const container = DockerAPI.getContainer(params.id)
+      const tail = parseInt((query.tail as string) || '1000', 10)
+      const follow = query.follow === 'true'
+
+      console.info(`📋 Fetching Logs of Container ${params.id}`, new Date().toISOString())
+
+      if (follow) {
+        // Streaming mode with Server-Sent Events
+        set.headers = {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        }
+
+        // When follow is true, container.logs returns Promise<ReadableStream>
+        // The ReadableStream from dockerode is a Web ReadableStream
+        const logStream = await container.logs({
+          stdout: true,
+          stderr: true,
+          follow: true,
+          tail: tail,
+          timestamps: true,
+        }) as unknown as ReadableStream<Uint8Array>
+
+        return new Response(
+          new ReadableStream({
+            async start(controller) {
+              const encoder = new TextEncoder()
+              const reader = logStream.getReader()
+              const decoder = new TextDecoder()
+
+              try {
+                while (true) {
+                  const { done, value } = await reader.read()
+                  if (done) {
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ line: '[Log stream ended]' })}\n\n`))
+                    controller.close()
+                    break
+                  }
+
+                  const text = decoder.decode(value, { stream: true })
+                  const lines = text.split('\n').filter(line => line.trim())
+                  for (const line of lines) {
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ line })}\n\n`))
+                  }
+                }
+              }
+              catch (error: unknown) {
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: errorMessage })}\n\n`))
+                controller.close()
+              }
+            },
+          }),
+          {
+            headers: {
+              'Content-Type': 'text/event-stream',
+              'Cache-Control': 'no-cache',
+              'Connection': 'keep-alive',
+            },
+          },
+        )
+      }
+      else {
+        // Non-streaming mode - return all logs at once
+        // When follow is false, container.logs returns Promise<Buffer>
+        const logsBuffer = await container.logs({
+          stdout: true,
+          stderr: true,
+          follow: false,
+          tail: tail,
+          timestamps: true,
+        })
+
+        const logText = logsBuffer.toString()
+        const logLines = logText.split('\n').filter(line => line.trim())
+
+        return { logs: logLines.slice(-tail) }
+      }
+    })
+
     .listen(3000)
 
   console.log(
