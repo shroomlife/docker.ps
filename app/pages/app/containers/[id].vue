@@ -394,7 +394,7 @@ onUnmounted(() => {
           <div
             v-for="(log, index) in logs"
             :key="index"
-            class="break-words text-white dark:text-black transition-colors"
+            class="wrap-break-word text-white dark:text-black transition-colors"
           >
             {{ log }}
           </div>

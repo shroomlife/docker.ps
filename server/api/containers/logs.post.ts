@@ -69,13 +69,15 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>) =>
       })
 
       return readable
-    } catch (error: any) {
+    }
+    catch (error) {
+      console.error('Failed to fetch logs:', error)
       throw createError({
-        statusCode: error.response?.status || 500,
-        statusMessage: error.response?.statusText || 'Failed to fetch logs',
+        statusCode: 500,
       })
     }
-  } else {
+  }
+  else {
     // Non-streaming mode
     const logsResponse = await axios<{ logs: string[] }>({
       method: 'GET',
@@ -88,4 +90,3 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>) =>
     return logsResponse.data
   }
 })
-
