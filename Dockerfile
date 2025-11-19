@@ -18,6 +18,7 @@ WORKDIR /app
 
 COPY package.json bun.lock ./
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 
 RUN bun install --production --ignore-scripts
 
@@ -31,6 +32,7 @@ ENV NODE_ENV=production
 ENV NUXT_PUBLIC_ENVIRONMENT=production
 
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/.output ./.output
 COPY --from=prod-deps /app/bun.lock ./bun.lock
 COPY --from=prod-deps /app/node_modules ./node_modules
