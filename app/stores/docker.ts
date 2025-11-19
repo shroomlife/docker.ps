@@ -1,4 +1,3 @@
-import type { DockerHost } from '@prisma/client'
 import { defineStore } from 'pinia'
 
 export const useDockerStore = defineStore('DockerStore', {
@@ -40,7 +39,7 @@ export const useDockerStore = defineStore('DockerStore', {
           authKey,
         } as DockerHostEditRequestBody,
       })
-      const index = this.availableHosts.findIndex(host => host.uuid === uuid)
+      const index = this.availableHosts.findIndex((host: DockerHost) => host.uuid === uuid)
       if (index !== -1) {
         this.availableHosts[index] = updatedHost
         if (this.currentHost?.uuid === uuid) {
@@ -60,7 +59,7 @@ export const useDockerStore = defineStore('DockerStore', {
 
     async setCurrentHost(uuid: string) {
       if (this.getCurrentHost?.uuid === uuid) return
-      const foundHost = this.availableHosts.find(host => host.uuid === uuid)
+      const foundHost = this.availableHosts.find((host: DockerHost) => host.uuid === uuid)
       if (foundHost) {
         if (this.currentHost?.uuid === foundHost.uuid) return
         this.resetHostData()
@@ -75,7 +74,7 @@ export const useDockerStore = defineStore('DockerStore', {
     loadCurrentHostFromSession() {
       const storedUuid = sessionStorage.getItem('dockerCurrentHostUuid')
       if (storedUuid) {
-        const foundHost = this.availableHosts.find(host => host.uuid === storedUuid)
+        const foundHost = this.availableHosts.find((host: DockerHost) => host.uuid === storedUuid)
         if (foundHost) {
           this.currentHost = foundHost
         }
@@ -118,13 +117,13 @@ export const useDockerStore = defineStore('DockerStore', {
       this.blockedContainerIds = this.blockedContainerIds.filter(blockedId => blockedId !== id)
     },
     updateContainer(updatedContainer: DockerStoreContainer) {
-      const index = this.containers.findIndex(c => c.id === updatedContainer.id)
+      const index = this.containers.findIndex((c: DockerStoreContainer) => c.id === updatedContainer.id)
       if (index !== -1) {
         this.containers[index] = updatedContainer
       }
     },
     removeContainer(id: string) {
-      this.containers = this.containers.filter(c => c.id !== id)
+      this.containers = this.containers.filter((c: DockerStoreContainer) => c.id !== id)
       this.removeBlockedContainer(id)
     },
   },

@@ -2,8 +2,6 @@ import type { H3Event, EventHandlerRequest } from 'h3'
 import { timingSafeEqual } from 'crypto'
 import axios from 'axios'
 import jwt from 'jsonwebtoken'
-import type { User, UserIdentity } from '@prisma/client'
-import { UserIdentityType } from '@prisma/client'
 
 export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): Promise<User> => {
   try {

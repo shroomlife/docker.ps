@@ -1,4 +1,3 @@
-import type { DockerHost } from '@prisma/client'
 import type { H3Event, EventHandlerRequest } from 'h3'
 
 export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): Promise<DockerHost> => {

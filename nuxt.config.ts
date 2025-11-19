@@ -3,6 +3,11 @@ import { version } from './package.json'
 export default defineNuxtConfig({
   modules: ['@nuxt/eslint', '@nuxt/ui', '@pinia/nuxt'],
   ssr: true,
+  imports: {
+    dirs: [
+      'shared/prisma/models/*.ts',
+    ],
+  },
   devtools: { enabled: true },
   app: {
     head: {
@@ -36,6 +41,11 @@ export default defineNuxtConfig({
   nitro: {
     preset: 'bun',
     compressPublicAssets: true,
+    imports: {
+      dirs: [
+        'shared/prisma/client.ts',
+      ],
+    },
   },
   eslint: {
     config: {

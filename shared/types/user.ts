@@ -1,4 +1,4 @@
-import type { DockerHost, User, UserIdentity } from '@prisma/client'
+import type { DockerHost, User, UserIdentity } from '../prisma/client'
 
 export interface UserWithIdentities extends User {
   identities: UserIdentity[]

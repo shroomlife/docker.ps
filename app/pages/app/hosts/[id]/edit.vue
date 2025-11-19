@@ -1,7 +1,6 @@
 <script lang="ts" setup>
 import * as v from 'valibot'
 import type { FormSubmitEvent } from '@nuxt/ui'
-import type { DockerHost } from '@prisma/client'
 
 const dockerStore = useDockerStore()
 

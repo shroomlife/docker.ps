@@ -1,4 +1,4 @@
-import type { DockerHost } from '@prisma/client'
+import type { DockerHost } from '../prisma/client'
 
 export interface DockerStoreState {
   currentHost: DockerHost | null
