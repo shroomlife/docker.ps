@@ -10,7 +10,6 @@ COPY . .
 ENV NODE_ENV=production
 ENV NUXT_PUBLIC_ENVIRONMENT=production
 
-RUN bun run db:generate
 RUN bun run build
 
 FROM oven/bun:1.2.21-alpine AS prod-deps
