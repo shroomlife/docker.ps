@@ -163,22 +163,64 @@ const startLogsStream = async () => {
 
     streamReader.value = reader
 
+    // Buffer for incomplete SSE messages across chunk boundaries
+    let messageBuffer = ''
+
     // Read stream
     const readStream = async () => {
       try {
         while (isStreaming.value) {
           const { done, value } = await reader.read()
           if (done) {
+            // Flush any remaining data in the decoder's internal buffer
+            // by decoding an empty buffer with stream: false
+            const remaining = decoder.decode(new Uint8Array(), { stream: false })
+            if (remaining) {
+              messageBuffer += remaining
+            }
+            // Process any remaining buffered data (even if it doesn't end with \n\n)
+            if (messageBuffer.trim()) {
+              // Split by \n\n, but also process the last part if it starts with 'data: '
+              const messages = messageBuffer.split('\n\n')
+              for (const message of messages) {
+                if (message.trim() && message.startsWith('data: ')) {
+                  try {
+                    const data = JSON.parse(message.slice(6))
+                    if (data.line) {
+                      addLogLine(data.line)
+                    }
+                    if (data.error) {
+                      toast.add({
+                        title: 'Log Stream Error',
+                        description: data.error,
+                        color: 'error',
+                      })
+                      stopLogsStream()
+                    }
+                  }
+                  catch {
+                    // Ignore parse errors
+                  }
+                }
+              }
+            }
             break
           }
 
+          // Decode chunk and append to buffer
           const chunk = decoder.decode(value, { stream: true })
-          const lines = chunk.split('\n')
+          messageBuffer += chunk
 
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
+          // Process complete SSE messages (ending with \n\n)
+          const messages = messageBuffer.split('\n\n')
+          // Keep the last incomplete message in buffer
+          messageBuffer = messages.pop() || ''
+
+          // Process each complete message
+          for (const message of messages) {
+            if (message.trim() && message.startsWith('data: ')) {
               try {
-                const data = JSON.parse(line.slice(6))
+                const data = JSON.parse(message.slice(6))
                 if (data.line) {
                   addLogLine(data.line)
                 }

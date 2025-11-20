@@ -174,18 +174,41 @@ try {
               const decoder = new TextDecoder()
 
               try {
+                let buffer = ''
                 while (true) {
                   const { done, value } = await reader.read()
                   if (done) {
+                    // Flush any remaining data in the decoder's internal buffer
+                    // by decoding an empty buffer with stream: false
+                    const remaining = decoder.decode(new Uint8Array(), { stream: false })
+                    if (remaining) {
+                      buffer += remaining
+                    }
+                    // Process any remaining buffered lines
+                    if (buffer.trim()) {
+                      const lines = buffer.split('\n').filter(line => line.trim())
+                      for (const line of lines) {
+                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ line })}\n\n`))
+                      }
+                    }
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ line: '[Log stream ended]' })}\n\n`))
                     controller.close()
                     break
                   }
 
                   const text = decoder.decode(value, { stream: true })
-                  const lines = text.split('\n').filter(line => line.trim())
+                  buffer += text
+
+                  // Process complete lines (ending with \n)
+                  const lines = buffer.split('\n')
+                  // Keep the last incomplete line in buffer
+                  buffer = lines.pop() || ''
+
+                  // Process each complete line
                   for (const line of lines) {
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ line })}\n\n`))
+                    if (line.trim()) {
+                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ line })}\n\n`))
+                    }
                   }
                 }
               }
