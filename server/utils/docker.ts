@@ -63,15 +63,26 @@ export const DockerService = {
     const repoTag = image.RepoTags && image.RepoTags.length > 0
       ? image.RepoTags[0]
       : '<none>:<none>'
-    
+
+    if (!repoTag) {
+      return {
+        id: image.Id,
+        repository: '<none>',
+        tag: '<none>',
+        size: image.Size,
+        created: image.Created,
+        parentId: image.ParentId || undefined,
+      }
+    }
+
     const [repository, tag] = repoTag.includes(':')
       ? repoTag.split(':', 2)
       : [repoTag, 'latest']
 
     return {
       id: image.Id,
-      repository,
-      tag,
+      repository: repository || '<none>',
+      tag: tag || 'latest',
       size: image.Size,
       created: image.Created,
       parentId: image.ParentId || undefined,

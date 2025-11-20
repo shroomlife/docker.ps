@@ -35,7 +35,7 @@ const computedTitle = computed(() => {
   const repoTag = image.value.RepoTags && image.value.RepoTags.length > 0
     ? image.value.RepoTags[0]
     : '<none>:<none>'
-  return repoTag
+  return repoTag || '<none>:<none>'
 })
 
 const breadcrumbItems = computed(() => {
@@ -57,9 +57,12 @@ const getRepositoryTag = (repoTags: string[] | null | undefined): { repository: 
     return { repository: '<none>', tag: '<none>' }
   }
   const repoTag = repoTags[0]
+  if (!repoTag) {
+    return { repository: '<none>', tag: '<none>' }
+  }
   if (repoTag.includes(':')) {
     const [repository, tag] = repoTag.split(':', 2)
-    return { repository, tag }
+    return { repository: repository || '<none>', tag: tag || '<none>' }
   }
   return { repository: repoTag, tag: 'latest' }
 }
