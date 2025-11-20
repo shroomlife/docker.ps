@@ -156,50 +156,56 @@ try {
           'Connection': 'keep-alive',
         }
 
-        // When follow is true, container.logs returns Promise<ReadableStream>
-        // The ReadableStream from dockerode is a Web ReadableStream
-        const logStream = await container.logs({
+        // When follow is true, container.logs returns a Node.js stream (not Web ReadableStream)
+        console.log(`[Agent] Requesting Docker logs with follow=true, tail=${tail}`)
+        const nodeStream = await container.logs({
           stdout: true,
           stderr: true,
           follow: true,
           tail: tail,
           timestamps: true,
-        }) as unknown as ReadableStream<Uint8Array>
+        }) as NodeJS.ReadableStream
 
+        console.log(`[Agent] Got Docker log stream (Node.js stream), converting to Web ReadableStream...`)
+        const streamInfo = nodeStream as NodeJS.ReadableStream & { readable?: boolean }
+        console.log(`[Agent] Stream type: ${nodeStream.constructor.name}, readable: ${streamInfo.readable ?? 'unknown'}`)
+
+        // Convert Node.js stream to Web ReadableStream
         return new Response(
           new ReadableStream({
-            async start(controller) {
+            start(controller) {
+              console.log(`[Agent] ReadableStream start() called for container ${params.id}`)
               const encoder = new TextEncoder()
-              const reader = logStream.getReader()
               const decoder = new TextDecoder()
 
-              try {
-                let buffer = ''
-                let chunkCount = 0
-                while (true) {
-                  const { done, value } = await reader.read()
-                  if (done) {
-                    console.log(`[Agent] Stream ended for container ${params.id}, processed ${chunkCount} chunks`)
-                    // Flush any remaining data in the decoder's internal buffer
-                    // by decoding an empty buffer with stream: false
-                    const remaining = decoder.decode(new Uint8Array(), { stream: false })
-                    if (remaining) {
-                      buffer += remaining
-                    }
-                    // Process any remaining buffered lines
-                    if (buffer.trim()) {
-                      const lines = buffer.split('\n').filter(line => line.trim())
-                      for (const line of lines) {
-                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ line })}\n\n`))
-                      }
-                    }
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ line: '[Log stream ended]' })}\n\n`))
-                    controller.close()
-                    break
+              let buffer = ''
+              let chunkCount = 0
+              let lastActivity = Date.now()
+
+              // Keep-alive mechanism
+              const pingInterval = setInterval(() => {
+                if (Date.now() - lastActivity > 15000) { // Send ping if no activity for 15s
+                  try {
+                    controller.enqueue(encoder.encode(': ping\n\n'))
+                    lastActivity = Date.now()
+                  }
+                  catch (err) {
+                    console.error(`[Agent] Error sending ping for container ${params.id}:`, err)
+                    clearInterval(pingInterval)
+                  }
+                }
+              }, 5000)
+
+              // Handle Node.js stream events
+              nodeStream.on('data', (chunk: Buffer) => {
+                try {
+                  lastActivity = Date.now()
+                  chunkCount++
+                  if (chunkCount === 1) {
+                    console.log(`[Agent] First chunk from Docker stream, size: ${chunk.length} bytes`)
                   }
 
-                  chunkCount++
-                  const text = decoder.decode(value, { stream: true })
+                  const text = decoder.decode(chunk, { stream: true })
                   buffer += text
 
                   // Process complete lines (ending with \n)
@@ -217,12 +223,66 @@ try {
                       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ line })}\n\n`))
                     }
                   }
+
+                  if (chunkCount % 10 === 0) {
+                    console.log(`[Agent] Processed ${chunkCount} chunks so far`)
+                  }
                 }
-              }
-              catch (error: unknown) {
-                const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+                catch (error) {
+                  console.error(`[Agent] Error processing chunk ${chunkCount}:`, error)
+                }
+              })
+
+              nodeStream.on('end', () => {
+                clearInterval(pingInterval)
+                console.log(`[Agent] Docker stream ended for container ${params.id}, processed ${chunkCount} chunks`)
+                // Flush any remaining data in the decoder's internal buffer
+                const remaining = decoder.decode(new Uint8Array(), { stream: false })
+                if (remaining) {
+                  buffer += remaining
+                }
+                // Process any remaining buffered lines
+                if (buffer.trim()) {
+                  const lines = buffer.split('\n').filter(line => line.trim())
+                  for (const line of lines) {
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ line })}\n\n`))
+                  }
+                }
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ line: '[Log stream ended]' })}\n\n`))
+                controller.close()
+              })
+
+              nodeStream.on('error', (error: Error) => {
+                clearInterval(pingInterval)
+                console.error(`[Agent] Docker stream error for container ${params.id}:`, error)
+                const errorMessage = error.message || 'Unknown error'
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: errorMessage })}\n\n`))
                 controller.close()
+              })
+
+              // Ensure stream is flowing
+              const streamWithFlow = nodeStream as NodeJS.ReadableStream & { readableFlowing?: boolean | null, resume?: () => void }
+              if (streamWithFlow.readableFlowing === null || streamWithFlow.readableFlowing === false) {
+                console.log(`[Agent] Resuming Docker stream...`)
+                if (streamWithFlow.resume) {
+                  streamWithFlow.resume()
+                }
+              }
+            },
+            cancel(reason) {
+              // Clear interval can't be accessed here because it's scoped to start()
+              // But since the stream is closed, subsequent enqueue calls will fail and clear it
+
+              console.log(`[Agent] Stream cancelled for container ${params.id}, reason:`, reason)
+              // Clean up the Docker stream when client disconnects
+              const streamWithDestroy = nodeStream as NodeJS.ReadableStream & { destroy?: (error?: Error) => void }
+              if (streamWithDestroy.destroy) {
+                try {
+                  streamWithDestroy.destroy()
+                }
+                catch (err) {
+                  console.error(`[Agent] Error destroying Docker stream:`, err)
+                }
               }
             },
           }),
