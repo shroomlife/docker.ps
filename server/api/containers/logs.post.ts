@@ -53,8 +53,13 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>) =>
       // Convert Node.js stream to Web ReadableStream
       const readable = new ReadableStream({
         start(controller) {
+          let chunkCount = 0
           response.data.on('data', (chunk: Buffer) => {
             try {
+              chunkCount++
+              if (chunkCount === 1) {
+                console.log(`[Server] First chunk from agent, size: ${chunk.length} bytes`)
+              }
               controller.enqueue(new Uint8Array(chunk))
             }
             catch (error) {
@@ -64,6 +69,7 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>) =>
           })
 
           response.data.on('end', () => {
+            console.log(`[Server] Stream from agent ended after ${chunkCount} chunks`)
             controller.close()
           })
 

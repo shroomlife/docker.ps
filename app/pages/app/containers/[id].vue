@@ -52,14 +52,32 @@ const autoScroll = ref<boolean>(true)
 const streamReader = ref<ReadableStreamDefaultReader<Uint8Array> | null>(null)
 
 const cleanLogLine = (line: string): string => {
-  // 1. Entferne Docker Stream Header (erste Bytes)
+  if (!line || typeof line !== 'string') return ''
+
+  // 1. Entferne Docker Stream Header (8 Bytes: [STREAM][RESERVED][SIZE])
+  // Docker Log Format: [0x01/0x02][0x00][0x00][0x00][SIZE_HIGH][SIZE_MID][SIZE_LOW][SIZE_LOW]
+  let cleaned = line
+
+  // Entferne Docker Stream Header: \x01 oder \x02 gefolgt von 3x \x00 und dann 4 Bytes
+  // Wir müssen das als Binär-String behandeln, aber JavaScript Strings sind UTF-16
+  // Pattern: Stream-Type (0x01=stdout, 0x02=stderr) + 3 reserved bytes + 4 size bytes
   // eslint-disable-next-line no-control-regex
-  const cleaned = line.replace(/^[\u0000-\u0008]+/, '')
+  cleaned = cleaned.replace(/^[\x01\x02][\x00]{3}[\x00-\xFF]{4}/, '')
+
+  // Fallback: Entferne alle Control-Zeichen am Anfang (inkl. \x01, \x02)
+  // eslint-disable-next-line no-control-regex
+  cleaned = cleaned.replace(/^[\u0000-\u0008\u0001\u0002]+/, '')
 
   // 2. Extrahiere Timestamp und Message
+  // Docker Logs mit timestamps haben Format: 2025-11-20T16:57:57.513967984Z MESSAGE
   const match = cleaned.match(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.\d+Z\s+(.*)/)
 
-  if (!match) return ''
+  if (!match) {
+    // Wenn kein Timestamp gefunden, versuche die Zeile direkt zu verwenden
+    // eslint-disable-next-line no-control-regex
+    const directMessage = cleaned.replace(/\u001b\[[0-9;]*[A-Za-z]/g, '').trim()
+    return directMessage || ''
+  }
 
   const [, timestamp, message = ''] = match
   const formattedTimestamp = moment(timestamp).format('YYYY-MM-DD HH:mm:ss')
@@ -170,10 +188,11 @@ const startLogsStream = async () => {
     const readStream = async () => {
       try {
         console.log('Starting to read log stream...')
+        let chunkCount = 0
         while (isStreaming.value) {
           const { done, value } = await reader.read()
           if (done) {
-            console.log('Stream ended (done=true)')
+            console.log(`Stream ended (done=true) after ${chunkCount} chunks`)
             // Flush any remaining data in the decoder's internal buffer
             // by decoding an empty buffer with stream: false
             const remaining = decoder.decode(new Uint8Array(), { stream: false })
@@ -209,9 +228,15 @@ const startLogsStream = async () => {
             break
           }
 
+          chunkCount++
+
           // Decode chunk and append to buffer
           const chunk = decoder.decode(value, { stream: true })
           messageBuffer += chunk
+
+          if (chunkCount === 1) {
+            console.log('First chunk received, length:', chunk.length, 'preview:', chunk.substring(0, 100))
+          }
 
           // Process complete SSE messages (ending with \n\n)
           const messages = messageBuffer.split('\n\n')
@@ -237,9 +262,14 @@ const startLogsStream = async () => {
                 }
               }
               catch (parseError) {
-                console.warn('Failed to parse SSE message:', message, parseError)
+                console.warn('Failed to parse SSE message:', message.substring(0, 200), parseError)
               }
             }
+          }
+
+          // Log every 10 chunks to see if stream is active
+          if (chunkCount % 10 === 0) {
+            console.log(`Stream active: ${chunkCount} chunks processed, buffer length: ${messageBuffer.length}`)
           }
         }
       }
