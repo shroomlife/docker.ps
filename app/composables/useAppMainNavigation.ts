@@ -10,6 +10,12 @@ export const useAppMainNavigation = (): ComputedRef<NavigationMenuItem[]> => {
         to: '/app/containers',
         active: route.path.startsWith('/app/containers'),
       },
+      {
+        label: 'Images',
+        icon: 'tabler:photo',
+        to: '/app/images',
+        active: route.path.startsWith('/app/images'),
+      },
     ]
   })
 }

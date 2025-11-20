@@ -1,4 +1,4 @@
-import type { ContainerInfo, ContainerInspectInfo } from 'dockerode'
+import type { ContainerInfo, ContainerInspectInfo, ImageInfo } from 'dockerode'
 import Dockerode from 'dockerode'
 
 export const DockerService = {
@@ -54,6 +54,27 @@ export const DockerService = {
       state: container.State,
       status: container.Status,
       created: container.Created,
+    }
+  },
+  simplifyImageInfo(image: ImageInfo): DockerStoreImage {
+    // Parse repository and tag from RepoTags
+    // RepoTags is an array like ["repository:tag", "repository:latest"]
+    // If empty, use "<none>" for both
+    const repoTag = image.RepoTags && image.RepoTags.length > 0
+      ? image.RepoTags[0]
+      : '<none>:<none>'
+    
+    const [repository, tag] = repoTag.includes(':')
+      ? repoTag.split(':', 2)
+      : [repoTag, 'latest']
+
+    return {
+      id: image.Id,
+      repository,
+      tag,
+      size: image.Size,
+      created: image.Created,
+      parentId: image.ParentId || undefined,
     }
   },
 }

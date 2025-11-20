@@ -6,6 +6,8 @@ export interface DockerStoreState {
   isLoadingContainers: boolean
   containers: DockerStoreContainer[]
   blockedContainerIds: string[]
+  isLoadingImages: boolean
+  images: DockerStoreImage[]
 }
 
 export interface DockerStorePort {
@@ -85,4 +87,27 @@ export interface DockerContainerLogsRequest {
   containerId: string
   follow?: boolean
   tail?: number
+}
+
+export interface DockerStoreImage {
+  id: string
+  repository: string
+  tag: string
+  size: number
+  created: number
+  parentId?: string
+}
+
+export interface DockerImageListRequest {
+  hostUuid: string
+}
+
+export interface DockerImageGetRequest {
+  hostUuid: string
+  imageId: string
+}
+
+export interface DockerImageRemoveRequest {
+  hostUuid: string
+  imageId: string
 }

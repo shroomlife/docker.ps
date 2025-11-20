@@ -166,6 +166,36 @@ GET /containers/:id/logs?tail=1000&follow=false
 
 **Response (follow=true)**: Server-Sent Events Stream mit kontinuierlichen Log-Updates
 
+### Images auflisten
+
+```http
+GET /images
+```
+
+Gibt eine Liste aller Images zurück.
+
+**Response**: Array von `ImageInfo` Objekten
+
+### Image-Details abrufen
+
+```http
+GET /images/:id
+```
+
+Gibt detaillierte Informationen zu einem spezifischen Image zurück.
+
+**Response**: `ImageInspectInfo` Objekt
+
+### Image entfernen
+
+```http
+GET /images/:id/remove
+```
+
+Entfernt ein Image (mit `force: true`).
+
+**Response**: `{ message: "Image {id} has been removed." }`
+
 ## 🚀 Installation & Deployment
 
 ### Voraussetzungen

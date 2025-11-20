@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import type { Container, ContainerInfo, ContainerInspectInfo } from 'dockerode'
+import type { Container, ContainerInfo, ContainerInspectInfo, Image, ImageInfo, ImageInspectInfo } from 'dockerode'
 import Dockerode from 'dockerode'
 import { randomBytes, createHash } from 'crypto'
 import { rmSync, watch } from 'fs'
@@ -251,6 +251,27 @@ try {
 
         return { logs: logLines.slice(-tail) }
       }
+    })
+
+    // Route to List all Images
+    .get('/images', async (): Promise<ImageInfo[]> => {
+      console.info('🖼️ Fetching List of Images', new Date().toISOString())
+      return await DockerAPI.listImages({ all: true })
+    })
+
+    // Route to Get Details of a Specific Image
+    .get('/images/:id', async ({ params }): Promise<ImageInspectInfo> => {
+      console.info(`🖼️ Fetching Details of Image ${params.id}`, new Date().toISOString())
+      const image: Image = DockerAPI.getImage(params.id)
+      return await image.inspect()
+    })
+
+    // Route to Remove an Image
+    .get('/images/:id/remove', async ({ params }) => {
+      console.info(`🖼️ Removing Image ${params.id}`, new Date().toISOString())
+      const image = DockerAPI.getImage(params.id)
+      await image.remove({ force: true })
+      return { message: `Image ${params.id} has been removed.` }
     })
 
     .listen(3000)

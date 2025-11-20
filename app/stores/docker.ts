@@ -8,6 +8,8 @@ export const useDockerStore = defineStore('DockerStore', {
       isLoadingContainers: false,
       containers: [],
       blockedContainerIds: [],
+      isLoadingImages: false,
+      images: [],
     }
   },
   actions: {
@@ -55,6 +57,7 @@ export const useDockerStore = defineStore('DockerStore', {
 
     resetHostData() {
       this.containers = []
+      this.images = []
     },
 
     async setCurrentHost(uuid: string) {
@@ -126,6 +129,36 @@ export const useDockerStore = defineStore('DockerStore', {
       this.containers = this.containers.filter((c: DockerStoreContainer) => c.id !== id)
       this.removeBlockedContainer(id)
     },
+    async loadImages() {
+      if (!this.getHasCurrentHost) return
+      const appStore = useAppStore()
+      try {
+        appStore.addLoader('dockerStore/loadImages')
+        this.isLoadingImages = true
+        this.images = await $fetch<DockerStoreImage[]>('/api/images/list', {
+          method: 'POST',
+          body: {
+            hostUuid: this.getCurrentHost?.uuid,
+          } as DockerImageListRequest,
+        })
+      }
+      catch (error) {
+        console.error('Failed to load Docker images:', error)
+        const toast = useToast()
+        toast.add({
+          title: 'Error',
+          description: 'Failed to load Docker images.',
+          color: 'error',
+        })
+      }
+      finally {
+        this.isLoadingImages = false
+        appStore.removeLoader('dockerStore/loadImages')
+      }
+    },
+    removeImage(id: string) {
+      this.images = this.images.filter((i: DockerStoreImage) => i.id !== id)
+    },
   },
   getters: {
     getCurrentHost: state => state.currentHost,
@@ -134,5 +167,7 @@ export const useDockerStore = defineStore('DockerStore', {
     getContainers: state => state.containers,
     getBlockedContainerIds: state => state.blockedContainerIds,
     getIsLoadingContainers: state => state.isLoadingContainers,
+    getImages: state => state.images,
+    getIsLoadingImages: state => state.isLoadingImages,
   },
 })
