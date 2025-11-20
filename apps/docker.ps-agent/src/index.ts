@@ -253,6 +253,63 @@ try {
       }
     })
 
+    // Route to Download Container Logs (raw, all logs without tail limit)
+    .get('/containers/:id/logs/download', async ({ params, set }) => {
+      const container = DockerAPI.getContainer(params.id)
+      
+      console.info(`📥 Downloading raw logs of Container ${params.id}`, new Date().toISOString())
+
+      // Get all logs without tail limit - this returns raw buffer
+      const logsBuffer = await container.logs({
+        stdout: true,
+        stderr: true,
+        follow: false,
+        timestamps: true,
+      }) as Buffer
+
+      // Decode Docker log stream format
+      // Docker log format: [STREAM_TYPE (1 byte)][RESERVED (3 bytes)][SIZE (4 bytes)][PAYLOAD]
+      const decodedLines: string[] = []
+      let offset = 0
+      
+      while (offset < logsBuffer.length) {
+        if (offset + 8 > logsBuffer.length) {
+          break // Not enough bytes for header
+        }
+        
+        // Read header (8 bytes)
+        const streamType = logsBuffer[offset] // 0x01 = stdout, 0x02 = stderr
+        // Skip reserved bytes (offset + 1, 2, 3)
+        
+        // Read size (4 bytes, big-endian)
+        const size = logsBuffer.readUInt32BE(offset + 4)
+        
+        offset += 8 // Move past header
+        
+        if (offset + size > logsBuffer.length) {
+          break // Not enough bytes for payload
+        }
+        
+        // Extract payload
+        const payload = logsBuffer.subarray(offset, offset + size)
+        const line = payload.toString('utf-8')
+        decodedLines.push(line)
+        
+        offset += size
+      }
+
+      // Join all lines with newlines
+      const rawLogs = decodedLines.join('')
+
+      // Return raw logs as text/plain
+      set.headers = {
+        'Content-Type': 'text/plain',
+        'Content-Disposition': `attachment; filename="logs-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)}.log"`,
+      }
+
+      return rawLogs
+    })
+
     // Route to List all Images
     .get('/images', async (): Promise<ImageInfo[]> => {
       console.info('🖼️ Fetching List of Images', new Date().toISOString())

@@ -369,6 +369,57 @@ onMounted(async () => {
   }
 })
 
+// Download logs function
+const downloadLogs = async () => {
+  if (!dockerStore.currentHost) {
+    toast.add({
+      title: 'Error',
+      description: 'No Docker host selected',
+      color: 'error',
+    })
+    return
+  }
+
+  try {
+    const response = await $fetch<string>('/api/containers/logs/download', {
+      method: 'POST',
+      body: {
+        hostUuid: dockerStore.currentHost.uuid,
+        containerId: containerId.value,
+      } as DockerContainerLogsRequest,
+    })
+
+    // Generate filename with timestamp
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+    const filename = `logs-${timestamp}.log`
+
+    // Create blob and download
+    const blob = new Blob([response], { type: 'text/plain' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+
+    toast.add({
+      title: 'Success',
+      description: 'Logs downloaded successfully',
+      color: 'success',
+    })
+  }
+  catch (error) {
+    console.error('Failed to download logs:', error)
+    toast.add({
+      title: 'Error',
+      description: 'Failed to download logs',
+      color: 'error',
+    })
+  }
+}
+
 // Cleanup on unmount
 onUnmounted(() => {
   stopLogsStream()
@@ -442,6 +493,16 @@ onUnmounted(() => {
           <h3 class="text-lg font-semibold">
             Container Logs
           </h3>
+          <UButton
+            icon="i-tabler-download"
+            color="primary"
+            variant="outline"
+            size="sm"
+            :loading="isLogsLoading"
+            @click="downloadLogs"
+          >
+            Download Raw Logs
+          </UButton>
         </div>
       </template>
       <div
