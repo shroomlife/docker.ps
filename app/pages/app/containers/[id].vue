@@ -169,9 +169,11 @@ const startLogsStream = async () => {
     // Read stream
     const readStream = async () => {
       try {
+        console.log('Starting to read log stream...')
         while (isStreaming.value) {
           const { done, value } = await reader.read()
           if (done) {
+            console.log('Stream ended (done=true)')
             // Flush any remaining data in the decoder's internal buffer
             // by decoding an empty buffer with stream: false
             const remaining = decoder.decode(new Uint8Array(), { stream: false })
@@ -225,6 +227,7 @@ const startLogsStream = async () => {
                   addLogLine(data.line)
                 }
                 if (data.error) {
+                  console.error('Stream error received:', data.error)
                   toast.add({
                     title: 'Log Stream Error',
                     description: data.error,
@@ -233,8 +236,8 @@ const startLogsStream = async () => {
                   stopLogsStream()
                 }
               }
-              catch {
-                // Ignore parse errors
+              catch (parseError) {
+                console.warn('Failed to parse SSE message:', message, parseError)
               }
             }
           }

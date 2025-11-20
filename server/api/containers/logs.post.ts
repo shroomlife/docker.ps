@@ -32,9 +32,13 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>) =>
 
   if (follow) {
     // Streaming mode - proxy the SSE stream
+    // Headers für Nginx Proxy Manager (NPM) SSE-Support
     setHeader(event, 'Content-Type', 'text/event-stream')
     setHeader(event, 'Cache-Control', 'no-cache')
     setHeader(event, 'Connection', 'keep-alive')
+    setHeader(event, 'X-Accel-Buffering', 'no') // Wichtig: Deaktiviert NPM Buffering
+    setHeader(event, 'Transfer-Encoding', 'chunked') // Wichtig: Ermöglicht Streaming
+    setHeader(event, 'X-Content-Type-Options', 'nosniff') // Sicherheit
 
     try {
       const response = await axios({
@@ -50,7 +54,13 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>) =>
       const readable = new ReadableStream({
         start(controller) {
           response.data.on('data', (chunk: Buffer) => {
-            controller.enqueue(new Uint8Array(chunk))
+            try {
+              controller.enqueue(new Uint8Array(chunk))
+            }
+            catch (error) {
+              console.error('Error enqueueing chunk:', error)
+              controller.error(error)
+            }
           })
 
           response.data.on('end', () => {
@@ -58,12 +68,19 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>) =>
           })
 
           response.data.on('error', (error: Error) => {
-            const encoder = new TextEncoder()
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: error.message })}\n\n`))
+            console.error('Stream error from agent:', error)
+            try {
+              const encoder = new TextEncoder()
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: error.message })}\n\n`))
+            }
+            catch (e) {
+              console.error('Error sending error message:', e)
+            }
             controller.close()
           })
         },
         cancel() {
+          console.log('Stream cancelled by client')
           response.data.destroy()
         },
       })

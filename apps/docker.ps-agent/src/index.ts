@@ -175,9 +175,11 @@ try {
 
               try {
                 let buffer = ''
+                let chunkCount = 0
                 while (true) {
                   const { done, value } = await reader.read()
                   if (done) {
+                    console.log(`[Agent] Stream ended for container ${params.id}, processed ${chunkCount} chunks`)
                     // Flush any remaining data in the decoder's internal buffer
                     // by decoding an empty buffer with stream: false
                     const remaining = decoder.decode(new Uint8Array(), { stream: false })
@@ -196,6 +198,7 @@ try {
                     break
                   }
 
+                  chunkCount++
                   const text = decoder.decode(value, { stream: true })
                   buffer += text
 
@@ -205,6 +208,10 @@ try {
                   buffer = lines.pop() || ''
 
                   // Process each complete line
+                  const linesProcessed = lines.filter(line => line.trim()).length
+                  if (linesProcessed > 0) {
+                    console.log(`[Agent] Processing ${linesProcessed} log lines from chunk ${chunkCount}`)
+                  }
                   for (const line of lines) {
                     if (line.trim()) {
                       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ line })}\n\n`))
