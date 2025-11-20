@@ -28,4 +28,3 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): P
   return remoteDockerImages.data
     .map((image: ImageInfo) => (DockerService.simplifyImageInfo(image)))
 })
-

@@ -30,4 +30,3 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): P
 
   return remoteDockerImage.data
 })
-

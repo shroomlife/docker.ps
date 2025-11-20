@@ -52,7 +52,7 @@ const breadcrumbItems = computed(() => {
   ]
 })
 
-const getRepositoryTag = (repoTags: string[] | null | undefined): { repository: string; tag: string } => {
+const getRepositoryTag = (repoTags: string[] | null | undefined): { repository: string, tag: string } => {
   if (!repoTags || repoTags.length === 0) {
     return { repository: '<none>', tag: '<none>' }
   }
@@ -226,4 +226,3 @@ onMounted(async () => {
 <style lang="scss" scoped>
 
 </style>
-
