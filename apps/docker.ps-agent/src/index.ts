@@ -5,6 +5,7 @@ import { randomBytes, createHash } from 'crypto'
 import { rmSync, watch } from 'fs'
 import { join } from 'path'
 import { mkdir } from 'node:fs/promises'
+import moment from 'moment'
 
 const keyPrefix = 'docker_ps'
 
@@ -93,13 +94,13 @@ try {
 
     // Route to List all Containers
     .get('/containers', async (): Promise<ContainerInfo[]> => {
-      console.info('📦 Fetching List of Containers', new Date().toISOString())
+      console.info('📦 Fetching List of Containers', moment().toISOString())
       return await DockerAPI.listContainers({ all: true })
     })
 
     // Route to Get Details of a Specific Container
     .get('/containers/:id', async ({ params }): Promise<ContainerInspectInfo> => {
-      console.info(`📦 Fetching Details of Container ${params.id}`, new Date().toISOString())
+      console.info(`📦 Fetching Details of Container ${params.id}`, moment().toISOString())
       const container: Container = DockerAPI.getContainer(params.id)
       return await container.inspect()
     })
@@ -146,7 +147,7 @@ try {
       const tail = parseInt((query.tail as string) || '1000', 10)
       const since = query.since ? parseInt(query.since as string, 10) : 0
 
-      console.info(`📋 Fetching Logs of Container ${params.id}`, new Date().toISOString())
+      console.info(`📋 Fetching Logs of Container ${params.id}`, moment().toISOString())
 
       // Non-streaming mode - return all logs at once
       const logsBuffer = await container.logs({
@@ -168,75 +169,98 @@ try {
     .get('/containers/:id/logs/download', async ({ params, set }) => {
       const container = DockerAPI.getContainer(params.id)
 
-      console.info(`📥 Downloading raw logs of Container ${params.id}`, new Date().toISOString())
+      console.info(`📥 Downloading raw logs of Container ${params.id}`, moment().toISOString())
 
-      // Get all logs without tail limit - this returns raw buffer
-      const logsBuffer = await container.logs({
-        stdout: true,
-        stderr: true,
-        follow: false,
-        timestamps: true,
-      }) as Buffer
+      try {
+        // Get all logs without tail limit - this returns raw buffer
+        const logsBuffer = await container.logs({
+          stdout: true,
+          stderr: true,
+          follow: false,
+          timestamps: true,
+        }) as Buffer
 
-      // Decode Docker log stream format
-      // Docker log format: [STREAM_TYPE (1 byte)][RESERVED (3 bytes)][SIZE (4 bytes)][PAYLOAD]
-      const decodedLines: string[] = []
-      let offset = 0
-
-      while (offset < logsBuffer.length) {
-        if (offset + 8 > logsBuffer.length) {
-          break // Not enough bytes for header
+        // Handle empty logs
+        if (!logsBuffer || logsBuffer.length === 0) {
+          set.headers = {
+            'Content-Type': 'text/plain',
+            'Content-Disposition': `attachment; filename="logs-${moment().format('YYYY-MM-DDTHH-mm-ss')}.log"`,
+          }
+          return ''
         }
 
-        // Read header (8 bytes)
-        // Stream type at offset: 0x01 = stdout, 0x02 = stderr (not currently used)
-        // Skip reserved bytes (offset + 1, 2, 3)
+        // Decode Docker log stream format
+        // Docker log format: [STREAM_TYPE (1 byte)][RESERVED (3 bytes)][SIZE (4 bytes)][PAYLOAD]
+        const decodedLines: string[] = []
+        let offset = 0
 
-        // Read size (4 bytes, big-endian)
-        const size = logsBuffer.readUInt32BE(offset + 4)
+        while (offset < logsBuffer.length) {
+          if (offset + 8 > logsBuffer.length) {
+            // Handle incomplete header at end of buffer
+            break
+          }
 
-        offset += 8 // Move past header
+          // Read header (8 bytes)
+          // Stream type at offset: 0x01 = stdout, 0x02 = stderr (not currently used)
+          // Skip reserved bytes (offset + 1, 2, 3)
 
-        if (offset + size > logsBuffer.length) {
-          break // Not enough bytes for payload
+          // Read size (4 bytes, big-endian)
+          const size = logsBuffer.readUInt32BE(offset + 4)
+
+          // Validate size to prevent infinite loops or buffer overflows
+          if (size === 0 || size > logsBuffer.length) {
+            break
+          }
+
+          offset += 8 // Move past header
+
+          if (offset + size > logsBuffer.length) {
+            // Handle incomplete payload at end of buffer
+            break
+          }
+
+          // Extract payload
+          const payload = logsBuffer.subarray(offset, offset + size)
+          const line = payload.toString('utf-8')
+          decodedLines.push(line)
+
+          offset += size
         }
 
-        // Extract payload
-        const payload = logsBuffer.subarray(offset, offset + size)
-        const line = payload.toString('utf-8')
-        decodedLines.push(line)
+        // Join all lines with newlines (preserve original line structure)
+        const rawLogs = decodedLines.join('\n')
 
-        offset += size
+        // Return raw logs as text/plain
+        set.headers = {
+          'Content-Type': 'text/plain',
+          'Content-Disposition': `attachment; filename="logs-${moment().format('YYYY-MM-DDTHH-mm-ss')}.log"`,
+        }
+
+        return rawLogs
       }
-
-      // Join all lines with newlines
-      const rawLogs = decodedLines.join('')
-
-      // Return raw logs as text/plain
-      set.headers = {
-        'Content-Type': 'text/plain',
-        'Content-Disposition': `attachment; filename="logs-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)}.log"`,
+      catch (error) {
+        console.error(`❌ Error downloading logs for container ${params.id}:`, error)
+        set.status = 500
+        return { error: error instanceof Error ? error.message : 'Failed to download logs' }
       }
-
-      return rawLogs
     })
 
     // Route to List all Images
     .get('/images', async (): Promise<ImageInfo[]> => {
-      console.info('🖼️ Fetching List of Images', new Date().toISOString())
+      console.info('🖼️ Fetching List of Images', moment().toISOString())
       return await DockerAPI.listImages({ all: true })
     })
 
     // Route to Get Details of a Specific Image
     .get('/images/:id', async ({ params }): Promise<ImageInspectInfo> => {
-      console.info(`🖼️ Fetching Details of Image ${params.id}`, new Date().toISOString())
+      console.info(`🖼️ Fetching Details of Image ${params.id}`, moment().toISOString())
       const image: Image = DockerAPI.getImage(params.id)
       return await image.inspect()
     })
 
     // Route to Remove an Image
     .get('/images/:id/remove', async ({ params }) => {
-      console.info(`🖼️ Removing Image ${params.id}`, new Date().toISOString())
+      console.info(`🖼️ Removing Image ${params.id}`, moment().toISOString())
       const image = DockerAPI.getImage(params.id)
       await image.remove({ force: true })
       return { message: `Image ${params.id} has been removed.` }

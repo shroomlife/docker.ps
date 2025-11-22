@@ -8,6 +8,7 @@ definePageMeta({
 
 const isLoading = ref<boolean>(true)
 const isLogsLoading = ref<boolean>(false)
+const isDownloading = ref<boolean>(false)
 const toast = useToast()
 const dockerStore = useDockerStore()
 
@@ -264,17 +265,34 @@ const downloadLogs = async () => {
     return
   }
 
+  if (isDownloading.value) {
+    return // Prevent multiple simultaneous downloads
+  }
+
   try {
+    isDownloading.value = true
+
     const response = await $fetch<string>('/api/containers/logs/download', {
       method: 'POST',
       body: {
         hostUuid: dockerStore.currentHost.uuid,
         containerId: containerId.value,
       } as DockerContainerLogsRequest,
+      timeout: 300000, // 5 minutes timeout
     })
 
+    // Handle empty response
+    if (!response || response.length === 0) {
+      toast.add({
+        title: 'Info',
+        description: 'No logs available for download',
+        color: 'info',
+      })
+      return
+    }
+
     // Generate filename with timestamp
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+    const timestamp = moment().format('YYYY-MM-DDTHH-mm-ss')
     const filename = `logs-${timestamp}.log`
 
     // Create blob and download
@@ -294,13 +312,30 @@ const downloadLogs = async () => {
       color: 'success',
     })
   }
-  catch (error) {
+  catch (error: unknown) {
     console.error('Failed to download logs:', error)
+
+    let errorMessage = 'Failed to download logs'
+    if (error && typeof error === 'object') {
+      if ('statusMessage' in error && typeof error.statusMessage === 'string') {
+        errorMessage = error.statusMessage
+      }
+      else if ('message' in error && typeof error.message === 'string') {
+        errorMessage = error.message
+      }
+    }
+    else if (typeof error === 'string') {
+      errorMessage = error
+    }
+
     toast.add({
       title: 'Error',
-      description: 'Failed to download logs',
+      description: errorMessage,
       color: 'error',
     })
+  }
+  finally {
+    isDownloading.value = false
   }
 }
 </script>
@@ -388,7 +423,8 @@ const downloadLogs = async () => {
               color="primary"
               variant="outline"
               size="sm"
-              :loading="isLogsLoading"
+              :loading="isDownloading"
+              :disabled="isDownloading"
               @click="downloadLogs"
             >
               Download Raw Logs
