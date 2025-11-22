@@ -140,177 +140,28 @@ try {
       return { message: `Container ${params.id} has been removed.` }
     })
 
-    // Route to Get Container Logs (with streaming support)
-    .get('/containers/:id/logs', async ({ params, query, set }) => {
+    // Route to Get Container Logs (simple poll based)
+    .get('/containers/:id/logs', async ({ params, query }) => {
       const container = DockerAPI.getContainer(params.id)
       const tail = parseInt((query.tail as string) || '1000', 10)
-      const follow = query.follow === 'true'
+      const since = query.since ? parseInt(query.since as string, 10) : 0
 
       console.info(`📋 Fetching Logs of Container ${params.id}`, new Date().toISOString())
 
-      if (follow) {
-        // Streaming mode with Server-Sent Events
-        set.headers = {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive',
-        }
+      // Non-streaming mode - return all logs at once
+      const logsBuffer = await container.logs({
+        stdout: true,
+        stderr: true,
+        follow: false,
+        tail: tail,
+        since: since,
+        timestamps: true,
+      })
 
-        // When follow is true, container.logs returns a Node.js stream (not Web ReadableStream)
-        console.log(`[Agent] Requesting Docker logs with follow=true, tail=${tail}`)
-        const nodeStream = await container.logs({
-          stdout: true,
-          stderr: true,
-          follow: true,
-          tail: tail,
-          timestamps: true,
-        }) as NodeJS.ReadableStream
+      const logText = logsBuffer.toString()
+      const logLines = logText.split('\n').filter(line => line.trim())
 
-        console.log(`[Agent] Got Docker log stream (Node.js stream), converting to Web ReadableStream...`)
-        const streamInfo = nodeStream as NodeJS.ReadableStream & { readable?: boolean }
-        console.log(`[Agent] Stream type: ${nodeStream.constructor.name}, readable: ${streamInfo.readable ?? 'unknown'}`)
-
-        // Convert Node.js stream to Web ReadableStream
-        return new Response(
-          new ReadableStream({
-            start(controller) {
-              console.log(`[Agent] ReadableStream start() called for container ${params.id}`)
-              const encoder = new TextEncoder()
-              const decoder = new TextDecoder()
-
-              let buffer = ''
-              let chunkCount = 0
-              let lastActivity = Date.now()
-
-              // Keep-alive mechanism
-              const pingInterval = setInterval(() => {
-                if (Date.now() - lastActivity > 15000) { // Send ping if no activity for 15s
-                  try {
-                    controller.enqueue(encoder.encode(': ping\n\n'))
-                    lastActivity = Date.now()
-                  }
-                  catch (err) {
-                    console.error(`[Agent] Error sending ping for container ${params.id}:`, err)
-                    clearInterval(pingInterval)
-                  }
-                }
-              }, 5000)
-
-              // Handle Node.js stream events
-              nodeStream.on('data', (chunk: Buffer) => {
-                try {
-                  lastActivity = Date.now()
-                  chunkCount++
-                  if (chunkCount === 1) {
-                    console.log(`[Agent] First chunk from Docker stream, size: ${chunk.length} bytes`)
-                  }
-
-                  const text = decoder.decode(chunk, { stream: true })
-                  buffer += text
-
-                  // Process complete lines (ending with \n)
-                  const lines = buffer.split('\n')
-                  // Keep the last incomplete line in buffer
-                  buffer = lines.pop() || ''
-
-                  // Process each complete line
-                  const linesProcessed = lines.filter(line => line.trim()).length
-                  if (linesProcessed > 0) {
-                    console.log(`[Agent] Processing ${linesProcessed} log lines from chunk ${chunkCount}`)
-                  }
-                  for (const line of lines) {
-                    if (line.trim()) {
-                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ line })}\n\n`))
-                    }
-                  }
-
-                  if (chunkCount % 10 === 0) {
-                    console.log(`[Agent] Processed ${chunkCount} chunks so far`)
-                  }
-                }
-                catch (error) {
-                  console.error(`[Agent] Error processing chunk ${chunkCount}:`, error)
-                }
-              })
-
-              nodeStream.on('end', () => {
-                clearInterval(pingInterval)
-                console.log(`[Agent] Docker stream ended for container ${params.id}, processed ${chunkCount} chunks`)
-                // Flush any remaining data in the decoder's internal buffer
-                const remaining = decoder.decode(new Uint8Array(), { stream: false })
-                if (remaining) {
-                  buffer += remaining
-                }
-                // Process any remaining buffered lines
-                if (buffer.trim()) {
-                  const lines = buffer.split('\n').filter(line => line.trim())
-                  for (const line of lines) {
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ line })}\n\n`))
-                  }
-                }
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ line: '[Log stream ended]' })}\n\n`))
-                controller.close()
-              })
-
-              nodeStream.on('error', (error: Error) => {
-                clearInterval(pingInterval)
-                console.error(`[Agent] Docker stream error for container ${params.id}:`, error)
-                const errorMessage = error.message || 'Unknown error'
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: errorMessage })}\n\n`))
-                controller.close()
-              })
-
-              // Ensure stream is flowing
-              const streamWithFlow = nodeStream as NodeJS.ReadableStream & { readableFlowing?: boolean | null, resume?: () => void }
-              if (streamWithFlow.readableFlowing === null || streamWithFlow.readableFlowing === false) {
-                console.log(`[Agent] Resuming Docker stream...`)
-                if (streamWithFlow.resume) {
-                  streamWithFlow.resume()
-                }
-              }
-            },
-            cancel(reason) {
-              // Clear interval can't be accessed here because it's scoped to start()
-              // But since the stream is closed, subsequent enqueue calls will fail and clear it
-
-              console.log(`[Agent] Stream cancelled for container ${params.id}, reason:`, reason)
-              // Clean up the Docker stream when client disconnects
-              const streamWithDestroy = nodeStream as NodeJS.ReadableStream & { destroy?: (error?: Error) => void }
-              if (streamWithDestroy.destroy) {
-                try {
-                  streamWithDestroy.destroy()
-                }
-                catch (err) {
-                  console.error(`[Agent] Error destroying Docker stream:`, err)
-                }
-              }
-            },
-          }),
-          {
-            headers: {
-              'Content-Type': 'text/event-stream',
-              'Cache-Control': 'no-cache',
-              'Connection': 'keep-alive',
-            },
-          },
-        )
-      }
-      else {
-        // Non-streaming mode - return all logs at once
-        // When follow is false, container.logs returns Promise<Buffer>
-        const logsBuffer = await container.logs({
-          stdout: true,
-          stderr: true,
-          follow: false,
-          tail: tail,
-          timestamps: true,
-        })
-
-        const logText = logsBuffer.toString()
-        const logLines = logText.split('\n').filter(line => line.trim())
-
-        return { logs: logLines.slice(-tail) }
-      }
+      return { logs: logLines }
     })
 
     // Route to Download Container Logs (raw, all logs without tail limit)

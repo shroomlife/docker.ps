@@ -87,6 +87,7 @@ export interface DockerContainerLogsRequest {
   containerId: string
   follow?: boolean
   tail?: number
+  since?: number
 }
 
 export interface DockerStoreImage {

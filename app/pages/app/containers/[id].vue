@@ -23,6 +23,7 @@ if (!currentRoute.params.id) {
 
 const container = ref<ContainerInspectInfo | null>(null)
 const containerId = computed(() => currentRoute.params.id as string)
+const lastLogTimestamp = ref<number>(0)
 
 const computedTitle = computed(() => {
   return container.value?.Name.slice(1) || 'Loading...'
@@ -45,11 +46,8 @@ const breadcrumbItems = computed(() => {
 // Logs state
 const logs = ref<string[]>([])
 const maxLogLines = 1000
-const isStreaming = ref<boolean>(false)
-const eventSource = ref<EventSource | null>(null)
 const logsContainer = ref<HTMLDivElement | null>(null)
 const autoScroll = ref<boolean>(true)
-const streamReader = ref<ReadableStreamDefaultReader<Uint8Array> | null>(null)
 
 const cleanLogLine = (line: string): string => {
   if (!line || typeof line !== 'string') return ''
@@ -57,10 +55,6 @@ const cleanLogLine = (line: string): string => {
   // 1. Entferne Docker Stream Header (8 Bytes: [STREAM][RESERVED][SIZE])
   // Docker Log Format: [0x01/0x02][0x00][0x00][0x00][SIZE_HIGH][SIZE_MID][SIZE_LOW][SIZE_LOW]
   let cleaned = line
-
-  // Entferne Docker Stream Header: \x01 oder \x02 gefolgt von 3x \x00 und dann 4 Bytes
-  // Wir müssen das als Binär-String behandeln, aber JavaScript Strings sind UTF-16
-  // Pattern: Stream-Type (0x01=stdout, 0x02=stderr) + 3 reserved bytes + 4 size bytes
   // eslint-disable-next-line no-control-regex
   cleaned = cleaned.replace(/^[\x01\x02][\x00]{3}[\x00-\xFF]{4}/, '')
 
@@ -92,6 +86,22 @@ const cleanLogLine = (line: string): string => {
   return `${formattedTimestamp}: ${cleanMessage}`
 }
 
+const extractTimestamp = (line: string): number | null => {
+  if (!line || typeof line !== 'string') return null
+
+  let cleaned = line
+  // eslint-disable-next-line no-control-regex
+  cleaned = cleaned.replace(/^[\x01\x02][\x00]{3}[\x00-\xFF]{4}/, '')
+  // eslint-disable-next-line no-control-regex
+  cleaned = cleaned.replace(/^[\u0000-\u0008\u0001\u0002]+/, '')
+
+  const match = cleaned.match(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.\d+Z/)
+  if (match && match[1]) {
+    return moment(match[1]).unix()
+  }
+  return null
+}
+
 const scrollToBottom = () => {
   if (autoScroll.value && logsContainer.value) {
     // Use requestAnimationFrame for smoother scrolling
@@ -103,214 +113,89 @@ const scrollToBottom = () => {
   }
 }
 
-const addLogLine = (line: string) => {
-  const cleanedLine = cleanLogLine(line)
-  if (!cleanedLine) {
-    return
+const addLogLines = (newLogs: string[]) => {
+  if (newLogs.length === 0) return
+
+  const cleanedNewLogs: string[] = []
+  let maxTs = lastLogTimestamp.value
+
+  for (const line of newLogs) {
+    const ts = extractTimestamp(line)
+    if (ts && ts > maxTs) {
+      maxTs = ts
+    }
+    const cleaned = cleanLogLine(line)
+    if (cleaned) {
+      cleanedNewLogs.push(cleaned)
+    }
   }
 
-  logs.value.push(cleanedLine)
+  lastLogTimestamp.value = maxTs
+
+  if (cleanedNewLogs.length === 0) return
+
+  // Deduplication: Remove lines that appear in the last 100 lines of existing logs
+  // This prevents duplicates when fetching overlapping logs
+  const lookback = 100
+  const tailLogs = new Set(logs.value.slice(-lookback))
+
+  const logsToAdd = cleanedNewLogs.filter(line => !tailLogs.has(line))
+
+  if (logsToAdd.length === 0) return
+
+  logs.value.push(...logsToAdd)
+
   // Keep only the last maxLogLines
   if (logs.value.length > maxLogLines) {
-    logs.value.shift()
+    logs.value = logs.value.slice(-maxLogLines)
   }
+
   // Auto-scroll to bottom
   scrollToBottom()
 }
 
-// Start streaming logs
-const startLogsStream = async () => {
-  if (isStreaming.value || !dockerStore.currentHost) {
-    return
-  }
+const fetchLogs = async (sinceTimestamp: number = 0) => {
+  if (isLogsLoading.value || !dockerStore.currentHost) return
 
   try {
     isLogsLoading.value = true
-    isStreaming.value = true
 
-    // First, get initial logs (last 1000 lines)
-    const initialLogs = await $fetch<{ logs: string[] }>('/api/containers/logs', {
+    const response = await $fetch<{ logs: string[] }>('/api/containers/logs', {
       method: 'POST',
       body: {
         hostUuid: dockerStore.currentHost.uuid,
         containerId: containerId.value,
         follow: false,
         tail: maxLogLines,
+        since: sinceTimestamp,
       } as DockerContainerLogsRequest,
     })
 
-    // Clean initial logs
-    console.log('initialLogs', initialLogs)
-    logs.value = initialLogs.logs
-      .map(line => cleanLogLine(line))
-      .filter(line => line.length > 0)
-      .slice(-maxLogLines)
-
-    // Scroll to bottom after initial load
-    await nextTick()
-    scrollToBottom()
-
-    // Then start streaming
-    const runtimeConfig = useRuntimeConfig()
-    const baseUrl = runtimeConfig.public.appUrl || window.location.origin
-
-    // Use fetch with POST for SSE (since we need to send body)
-    const response = await fetch(`${baseUrl}/api/containers/logs`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        hostUuid: dockerStore.currentHost.uuid,
-        containerId: containerId.value,
-        follow: true,
-        tail: maxLogLines,
-      } as DockerContainerLogsRequest),
-    })
-
-    if (!response.ok) {
-      throw new Error('Failed to start log stream')
+    // If we fetched with since=0 (initial load), we replace logs
+    if (sinceTimestamp === 0) {
+      logs.value = []
+      lastLogTimestamp.value = 0
     }
 
-    const reader = response.body?.getReader()
-    const decoder = new TextDecoder()
-
-    if (!reader) {
-      throw new Error('No reader available')
-    }
-
-    streamReader.value = reader
-
-    // Buffer for incomplete SSE messages across chunk boundaries
-    let messageBuffer = ''
-
-    // Read stream
-    const readStream = async () => {
-      try {
-        console.log('Starting to read log stream...')
-        let chunkCount = 0
-        while (isStreaming.value) {
-          const { done, value } = await reader.read()
-          if (done) {
-            console.log(`Stream ended (done=true) after ${chunkCount} chunks`)
-            // Flush any remaining data in the decoder's internal buffer
-            // by decoding an empty buffer with stream: false
-            const remaining = decoder.decode(new Uint8Array(), { stream: false })
-            if (remaining) {
-              messageBuffer += remaining
-            }
-            // Process any remaining buffered data (even if it doesn't end with \n\n)
-            if (messageBuffer.trim()) {
-              // Split by \n\n, but also process the last part if it starts with 'data: '
-              const messages = messageBuffer.split('\n\n')
-              for (const message of messages) {
-                if (message.trim() && message.startsWith('data: ')) {
-                  try {
-                    const data = JSON.parse(message.slice(6))
-                    if (data.line) {
-                      addLogLine(data.line)
-                    }
-                    if (data.error) {
-                      toast.add({
-                        title: 'Log Stream Error',
-                        description: data.error,
-                        color: 'error',
-                      })
-                      stopLogsStream()
-                    }
-                  }
-                  catch {
-                    // Ignore parse errors
-                  }
-                }
-              }
-            }
-            break
-          }
-
-          chunkCount++
-
-          // Decode chunk and append to buffer
-          const chunk = decoder.decode(value, { stream: true })
-          messageBuffer += chunk
-
-          if (chunkCount === 1) {
-            console.log('First chunk received, length:', chunk.length, 'preview:', chunk.substring(0, 100))
-          }
-
-          // Process complete SSE messages (ending with \n\n)
-          const messages = messageBuffer.split('\n\n')
-          // Keep the last incomplete message in buffer
-          messageBuffer = messages.pop() || ''
-
-          // Process each complete message
-          for (const message of messages) {
-            if (message.trim() && message.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(message.slice(6))
-                if (data.line) {
-                  addLogLine(data.line)
-                }
-                if (data.error) {
-                  console.error('Stream error received:', data.error)
-                  toast.add({
-                    title: 'Log Stream Error',
-                    description: data.error,
-                    color: 'error',
-                  })
-                  stopLogsStream()
-                }
-              }
-              catch (parseError) {
-                console.warn('Failed to parse SSE message:', message.substring(0, 200), parseError)
-              }
-            }
-          }
-
-          // Log every 10 chunks to see if stream is active
-          if (chunkCount % 10 === 0) {
-            console.log(`Stream active: ${chunkCount} chunks processed, buffer length: ${messageBuffer.length}`)
-          }
-        }
-      }
-      catch (error) {
-        console.error('Error reading log stream:', error)
-        toast.add({
-          title: 'Log Stream Error',
-          description: 'Failed to read log stream',
-          color: 'error',
-        })
-        stopLogsStream()
-      }
-    }
-
-    readStream()
+    addLogLines(response.logs)
   }
   catch (error) {
-    console.error('Failed to start log stream:', error)
+    console.error('Failed to fetch logs:', error)
     toast.add({
       title: 'Error',
-      description: 'Failed to start log stream',
+      description: 'Failed to fetch logs',
       color: 'error',
     })
-    isStreaming.value = false
   }
   finally {
     isLogsLoading.value = false
   }
 }
 
-// Stop streaming logs (kept for cleanup on unmount)
-const stopLogsStream = () => {
-  isStreaming.value = false
-  if (eventSource.value) {
-    eventSource.value.close()
-    eventSource.value = null
-  }
-  if (streamReader.value) {
-    streamReader.value.cancel()
-    streamReader.value = null
-  }
+const refreshLogs = () => {
+  // Use the last timestamp (without adding 1s) to be safe against second-boundary issues
+  // Deduplication logic in addLogLines will handle overlaps
+  fetchLogs(lastLogTimestamp.value)
 }
 
 // Handle scroll to detect user scrolling up/down
@@ -350,9 +235,8 @@ onMounted(async () => {
       } as DockerContainerGetRequest,
     })
 
-    // Auto-start logs streaming after container info is loaded
     if (dockerStore.currentHost) {
-      await startLogsStream()
+      await fetchLogs()
     }
   }
   catch (error) {
@@ -419,11 +303,6 @@ const downloadLogs = async () => {
     })
   }
 }
-
-// Cleanup on unmount
-onUnmounted(() => {
-  stopLogsStream()
-})
 </script>
 
 <template>
@@ -493,16 +372,28 @@ onUnmounted(() => {
           <h3 class="text-lg font-semibold">
             Container Logs
           </h3>
-          <UButton
-            icon="i-tabler-download"
-            color="primary"
-            variant="outline"
-            size="sm"
-            :loading="isLogsLoading"
-            @click="downloadLogs"
-          >
-            Download Raw Logs
-          </UButton>
+          <div class="flex gap-2">
+            <UButton
+              icon="i-tabler-refresh"
+              color="neutral"
+              variant="outline"
+              size="sm"
+              :loading="isLogsLoading"
+              @click="refreshLogs"
+            >
+              Refresh Logs
+            </UButton>
+            <UButton
+              icon="i-tabler-download"
+              color="primary"
+              variant="outline"
+              size="sm"
+              :loading="isLogsLoading"
+              @click="downloadLogs"
+            >
+              Download Raw Logs
+            </UButton>
+          </div>
         </div>
       </template>
       <div
@@ -539,13 +430,6 @@ onUnmounted(() => {
       <template #footer>
         <div class="flex items-center justify-between text-xs text-gray-500">
           <span>{{ logs.length }} / {{ maxLogLines }} lines</span>
-          <span
-            v-if="isStreaming"
-            class="flex items-center gap-1"
-          >
-            <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            Streaming...
-          </span>
         </div>
       </template>
     </UCard>
