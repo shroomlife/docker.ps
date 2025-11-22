@@ -1,0 +1,42 @@
+---
+alwaysApply: true
+---
+# Cursor Project Rules
+
+## Automatische Qualitätssicherung nach finalen Aktionen
+
+Nach jeder finalen Aktion (wenn Code-Änderungen abgeschlossen sind) MÜSSEN folgende Schritte automatisch ausgeführt werden:
+
+1. **Linting**: `bun lint` ausführen, um Code-Qualität zu prüfen
+2. **Type Checking**: `bun typecheck` ausführen, um TypeScript-Fehler zu finden
+
+### Zusätzliche Checks bei Bedarf
+
+- **Datenbank-Updates**: Wenn Prisma-Schema-Änderungen (`prisma/schema.prisma`) oder Migrationen gemacht wurden, ZUERST `bun db:generate` ausführen, BEVOR `bun typecheck` läuft
+- **Dependency-Updates**: Wenn Type-Fehler auftreten, die auf fehlende Dependencies hindeuten, `bun i` ausführen und dann erneut `bun typecheck` ausführen
+
+### Workflow
+
+```
+Finale Aktion abgeschlossen
+  ↓
+[Wenn DB-Änderungen] → `bun db:generate`
+  ↓
+`bun lint`
+  ↓
+[Wenn Lint-Fehler] → `bun lint:fix` (wenn möglich)
+  ↓
+`bun typecheck`
+  ↓
+[Wenn Type-Fehler wegen Dependencies] → `bun i` → erneut `bun typecheck`
+  ↓
+Fertig
+```
+
+### Wichtige Hinweise
+
+- Diese Checks MÜSSEN nach jeder finalen Code-Änderung ausgeführt werden
+- Fehler müssen behoben werden, bevor die Aufgabe als abgeschlossen gilt
+- Bei DB-Änderungen IMMER zuerst `bun db:generate` ausführen
+- Type-Fehler können auf fehlende Dependencies hinweisen → dann `bun i` ausführen
+
