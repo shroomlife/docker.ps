@@ -6,6 +6,9 @@ on:
       - main
 
 jobs:
+  # ====================
+  # Shared Test Job
+  # ====================
   Test:
     runs-on: ubuntu-latest
     environment: Production
@@ -27,7 +30,11 @@ jobs:
       - name: Run Linter
         run: bun run lint
 
-  Build:
+  # ====================
+  # docker.ps (Main App)
+  # ====================
+  Build-Main-App:
+    name: Build docker.ps
     needs: Test
     runs-on: ubuntu-latest
     environment: Production
@@ -41,13 +48,14 @@ jobs:
           username: ${{ vars.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
-      - name: Build and Push Docker Production Image
+      - name: Build and Push docker.ps Image
         run: |
           docker build -t shroomlife/docker.ps:latest . &&
           docker push shroomlife/docker.ps:latest
 
-  Deploy:
-    needs: Build
+  Deploy-Main-App:
+    name: Deploy docker.ps
+    needs: Build-Main-App
     runs-on: ubuntu-latest
     environment: Production
     steps:
@@ -58,3 +66,26 @@ jobs:
           username: ${{ vars.DEPLOY_USERNAME }}
           key: ${{ secrets.DEPLOY_KEY }}
           script: docker compose pull docker_ps && docker compose up -d docker_ps
+
+  # ====================
+  # docker.ps-agent
+  # ====================
+  Build-Agent:
+    name: Build docker.ps-agent
+    needs: Test
+    runs-on: ubuntu-latest
+    environment: Production
+    steps:
+      - name: Check Out Repository
+        uses: actions/checkout@v5.0.0
+
+      - name: Log In to Docker Hub
+        uses: docker/login-action@v3.5.0
+        with:
+          username: ${{ vars.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build and Push docker.ps-agent Image
+        run: |
+          docker build -t shroomlife/docker.ps-agent:latest ./apps/docker.ps-agent &&
+          docker push shroomlife/docker.ps-agent:latest

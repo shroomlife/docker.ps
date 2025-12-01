@@ -11,7 +11,7 @@ defineProps<LogLineProps>()
 <template>
   <div
     class="log-line flex gap-3 select-text"
-    :class="{ 'bg-white/[0.02] dark:bg-black/[0.02]': index % 2 === 0 }"
+    :class="{ 'bg-white/2 dark:bg-black/2': index % 2 === 0 }"
   >
     <span class="timestamp shrink-0 text-gray-500 dark:text-gray-400 tabular-nums">
       {{ timestamp }}
