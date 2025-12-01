@@ -1,4 +1,4 @@
-FROM oven/bun:1.2.21-alpine AS builder
+FROM oven/bun:alpine AS builder
 
 WORKDIR /app
 
@@ -12,7 +12,7 @@ ENV NUXT_PUBLIC_ENVIRONMENT=production
 
 RUN bun run build
 
-FROM oven/bun:1.2.21-alpine AS prod-deps
+FROM oven/bun:alpine AS prod-deps
 
 WORKDIR /app
 
@@ -22,7 +22,7 @@ COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 
 RUN bun install --production --ignore-scripts
 
-FROM oven/bun:1.2.21-alpine AS runtime
+FROM oven/bun:alpine AS runtime
 
 LABEL docker.ps.self="true"
 

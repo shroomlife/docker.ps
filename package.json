@@ -31,7 +31,7 @@
     "pg": "8.16.3",
     "strip-ansi": "7.1.2",
     "valibot": "1.2.0",
-    "vue-virtual-scroller": "^1.1.2"
+    "vue-virtual-scroller": "^2.0.0-beta.8"
   },
   "devDependencies": {
     "@iconify-json/lucide": "1.2.77",

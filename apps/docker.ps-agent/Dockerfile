@@ -1,4 +1,4 @@
-FROM oven/bun:1.2.21-alpine
+FROM oven/bun:alpine
 
 LABEL docker.ps-agent="true"
 
