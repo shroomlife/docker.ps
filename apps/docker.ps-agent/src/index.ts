@@ -165,6 +165,79 @@ try {
       return { logs: logLines }
     })
 
+    // Route to Stream Container Logs (SSE - Server-Sent Events)
+    .get('/containers/:id/logs/stream', async ({ params, query, set }) => {
+      const container = DockerAPI.getContainer(params.id)
+      const tail = parseInt((query.tail as string) || '100', 10)
+
+      console.info(`📡 Starting SSE log stream for Container ${params.id}`, moment().toISOString())
+
+      // Set SSE headers
+      set.headers = {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      }
+
+      // Get Docker log stream with follow enabled
+      const logStream = await container.logs({
+        stdout: true,
+        stderr: true,
+        follow: true,
+        tail: tail,
+        timestamps: true,
+      })
+
+      // Create a ReadableStream for SSE
+      const stream = new ReadableStream({
+        async start(controller) {
+          const encoder = new TextEncoder()
+
+          // Send initial connected event
+          controller.enqueue(encoder.encode(`event: connected\ndata: {"status":"connected","containerId":"${params.id}"}\n\n`))
+
+          let buffer = ''
+
+          // Handle stream data
+          logStream.on('data', (chunk: Buffer) => {
+            const text = chunk.toString('utf-8')
+            buffer += text
+
+            // Process complete lines
+            const lines = buffer.split('\n')
+            buffer = lines.pop() || ''
+
+            for (const line of lines) {
+              if (line.trim()) {
+                // Clean Docker stream header (8 bytes)
+                let cleanedLine = line
+                if (cleanedLine.charCodeAt(0) <= 2) {
+                  cleanedLine = cleanedLine.slice(8)
+                }
+
+                const eventData = JSON.stringify({ log: cleanedLine })
+                controller.enqueue(encoder.encode(`event: log\ndata: ${eventData}\n\n`))
+              }
+            }
+          })
+
+          logStream.on('end', () => {
+            controller.enqueue(encoder.encode(`event: close\ndata: {"status":"closed"}\n\n`))
+            controller.close()
+          })
+
+          logStream.on('error', (err) => {
+            console.error('Log stream error:', err)
+            controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`))
+            controller.close()
+          })
+        },
+      })
+
+      return new Response(stream)
+    })
+
     // Route to Download Container Logs (raw, all logs without tail limit)
     .get('/containers/:id/logs/download', async ({ params, set }) => {
       const container = DockerAPI.getContainer(params.id)

@@ -90,6 +90,19 @@ export interface DockerContainerLogsRequest {
   since?: number
 }
 
+export interface DockerContainerLogsStreamRequest {
+  hostUuid: string
+  containerId: string
+  tail?: number
+}
+
+export interface DockerLogLine {
+  id: string
+  timestamp: string
+  message: string
+  raw: string
+}
+
 export interface DockerStoreImage {
   id: string
   repository: string

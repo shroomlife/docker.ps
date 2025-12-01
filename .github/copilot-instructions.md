@@ -1,0 +1,51 @@
+# Project Rules
+
+## ⚠️ KRITISCH: Automatische Qualitätssicherung - MUSS IMMER AUSGEFÜHRT WERDEN
+
+**WICHTIG**: Diese Regel ist MANDATORY und muss NACH JEDER Code-Änderung befolgt werden. Es ist NICHT optional!
+
+Nach JEDER Code-Änderung (wenn Dateien geändert, erstellt oder gelöscht wurden) MÜSSEN folgende Schritte **IMMER** und **AUTOMATISCH** ausgeführt werden:
+
+1. **Linting**: `bun lint` ausführen, um Code-Qualität zu prüfen
+2. **Type Checking**: `bun typecheck` ausführen, um TypeScript-Fehler zu finden
+
+**Diese Checks sind VERPFLICHTEND und müssen vor dem Abschluss der Aufgabe durchgeführt werden.**
+
+### Zusätzliche Checks bei Bedarf
+
+- **Datenbank-Updates**: Wenn Prisma-Schema-Änderungen (`prisma/schema.prisma`) oder Migrationen gemacht wurden, ZUERST `bun db:generate` ausführen, BEVOR `bun typecheck` läuft
+- **Dependency-Updates**: Wenn Type-Fehler auftreten, die auf fehlende Dependencies hindeuten, `bun i` ausführen und dann erneut `bun typecheck` ausführen
+
+### Workflow
+
+```
+Finale Aktion abgeschlossen
+  ↓
+[Wenn DB-Änderungen] → `bun db:generate`
+  ↓
+`bun lint`
+  ↓
+[Wenn Lint-Fehler] → `bun lint:fix` (wenn möglich)
+  ↓
+`bun typecheck`
+  ↓
+[Wenn Type-Fehler wegen Dependencies] → `bun i` → erneut `bun typecheck`
+  ↓
+Fertig
+```
+
+### ⚠️ KRITISCHE REGELN - MÜSSEN BEACHTET WERDEN
+
+- **MANDATORY**: Diese Checks MÜSSEN nach JEDER Code-Änderung ausgeführt werden - KEINE AUSNAHME!
+- **KEINE OPTION**: Fehler müssen behoben werden, bevor die Aufgabe als abgeschlossen gilt
+- **AUTOMATISCH**: Diese Checks müssen automatisch ausgeführt werden, nicht manuell vom User angefordert
+- **KEINE VERGESSEN**: Auch bei kleinen Änderungen müssen beide Checks (`bun lint` und `bun typecheck`) laufen
+- Bei DB-Änderungen IMMER zuerst `bun db:generate` ausführen
+- Type-Fehler können auf fehlende Dependencies hindeuten → dann `bun i` ausführen
+
+### Checkliste vor Abschluss einer Aufgabe
+
+- [ ] `bun lint` wurde ausgeführt (ohne Fehler)
+- [ ] `bun typecheck` wurde ausgeführt (ohne Fehler)
+- [ ] Alle Lint-Fehler wurden behoben
+- [ ] Alle Type-Fehler wurden behoben

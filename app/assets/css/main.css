@@ -25,3 +25,52 @@ button {
   background-position: center;
   background-repeat: no-repeat;
 }
+
+/* Virtual Scroller Styles for Logs */
+.log-scroller {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.log-scroller .vue-recycle-scroller__item-wrapper {
+  overflow: visible;
+}
+
+/* Log Line Styles */
+.log-line {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  padding: 0.25rem 0.75rem;
+  transition: background-color 0.15s ease;
+}
+
+.log-line:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.dark .log-line:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.log-line:nth-child(even) {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.dark .log-line:nth-child(even) {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Connection Status Pulse Animation */
+@keyframes pulse-green {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse-live {
+  animation: pulse-green 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

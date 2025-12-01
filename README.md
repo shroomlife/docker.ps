@@ -83,6 +83,8 @@ Die Hauptanwendung kommuniziert sicher mit den Agents auf den entfernten Servern
 - 🖥️ **Multi-Host Management** - Verwalte Container auf mehreren Servern
 - 📊 **Container-Übersicht** - Liste aller Container mit Status, Ports und Images
 - 🎮 **Container-Steuerung** - Start, Stop, Restart, Pause, Unpause, Remove
+- 📋 **Live Log Streaming** - Echtzeit-Logs mit SSE (Server-Sent Events)
+- 🖼️ **Image Management** - Docker Images anzeigen und entfernen
 - 🔑 **Sicherheit** - Auth-Key-basierte Kommunikation zwischen App und Agent
 - 🚀 **Modern UI** - Intuitive Benutzeroberfläche mit Nuxt UI
 - 📱 **Responsive** - Funktioniert auf Desktop und Mobile
@@ -93,18 +95,18 @@ Die Hauptanwendung kommuniziert sicher mit den Agents auf den entfernten Servern
 ## 🛠️ Technologie-Stack
 
 ### Hauptanwendung
-- **Framework**: [Nuxt.js](https://nuxt.com) 4.1.2
+- **Framework**: [Nuxt.js](https://nuxt.com) 4.2.1
 - **Runtime**: [Bun](https://bun.sh) 1.2.21
-- **UI**: [Nuxt UI](https://ui.nuxt.com) 4.0.0-alpha.2
-- **State Management**: [Pinia](https://pinia.vuejs.org) 3.0.3
-- **Datenbank**: [PostgreSQL](https://www.postgresql.org) mit [Prisma](https://www.prisma.io) 6.16.2
-- **Docker API**: [dockerode](https://github.com/apocas/dockerode) 4.0.8
+- **UI**: [Nuxt UI](https://ui.nuxt.com) 4.2.1
+- **State Management**: [Pinia](https://pinia.vuejs.org) 3.0.4
+- **Datenbank**: [PostgreSQL](https://www.postgresql.org) mit [Prisma](https://www.prisma.io) 7.0.1
+- **Docker API**: [dockerode](https://github.com/apocas/dockerode) 4.0.9
 - **Authentifizierung**: Google OAuth mit JWT
 
 ### Agent
 - **Framework**: [Elysia](https://elysiajs.com) 1.4.4
 - **Runtime**: [Bun](https://bun.sh) 1.2.21
-- **Docker API**: [dockerode](https://github.com/apocas/dockerode) 4.0.8
+- **Docker API**: [dockerode](https://github.com/apocas/dockerode) 4.0.9
 
 ---
 
@@ -461,11 +463,13 @@ Der Agent nutzt [dockerode](https://github.com/apocas/dockerode) für Docker-Ope
 - ✅ Container pausieren/unpausieren
 - ✅ Container neustarten
 - ✅ Container entfernen
+- ✅ Container-Logs abrufen (mit Live-Streaming via SSE)
+- ✅ Container-Logs herunterladen
+- ✅ Images auflisten
+- ✅ Images entfernen
 
 **Mögliche Erweiterungen**:
-- 📋 Container-Logs abrufen
 - 📊 Container-Statistiken (CPU, Memory, etc.)
-- 🖼️ Images verwalten
 - 🌐 Netzwerke verwalten
 - 💾 Volumes verwalten
 
@@ -476,7 +480,7 @@ Der Agent nutzt [dockerode](https://github.com/apocas/dockerode) für Docker-Ope
 ### Auth-Key System
 
 - Der Agent generiert beim ersten Start einen zufälligen Auth-Key
-- Dieser Key wird in `data/_auth-key` gespeichert
+- Dieser Key wird in `data/_auth.key` gespeichert
 - Die Hauptanwendung sendet diesen Key im `x-auth-key` Header
 - Der Agent validiert den Key mit SHA-256 Hash-Vergleich
 - Bei ungültigem Key wird der Request mit 401 abgelehnt

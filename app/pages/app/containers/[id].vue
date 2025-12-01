@@ -44,47 +44,80 @@ const breadcrumbItems = computed(() => {
   ]
 })
 
+// Log line interface for Virtual Scroller
+interface ParsedLogLine {
+  id: string
+  timestamp: string
+  message: string
+  raw: string
+}
+
 // Logs state
-const logs = ref<string[]>([])
-const maxLogLines = 1000
-const logsContainer = ref<HTMLDivElement | null>(null)
+const logs = ref<ParsedLogLine[]>([])
+const maxLogLines = 2000
 const autoScroll = ref<boolean>(true)
 
-const cleanLogLine = (line: string): string => {
-  if (!line || typeof line !== 'string') return ''
+// SSE Live Streaming State
+const isLiveMode = ref<boolean>(false)
+const connectionStatus = ref<'disconnected' | 'connecting' | 'connected' | 'reconnecting'>('disconnected')
+const eventSource = ref<EventSource | null>(null)
+const reconnectAttempts = ref<number>(0)
+const maxReconnectAttempts = 10
+const reconnectTimeoutId = ref<ReturnType<typeof setTimeout> | null>(null)
 
-  // 1. Entferne Docker Stream Header (8 Bytes: [STREAM][RESERVED][SIZE])
-  // Docker Log Format: [0x01/0x02][0x00][0x00][0x00][SIZE_HIGH][SIZE_MID][SIZE_LOW][SIZE_LOW]
+// Log batching for smooth UI updates (requestAnimationFrame based)
+const pendingLogs = ref<ParsedLogLine[]>([])
+let rafId: number | null = null
+
+// Virtual Scroller ref
+const scrollerRef = ref<{ scrollToBottom: () => void } | null>(null)
+
+// Generate unique ID for log lines
+let logIdCounter = 0
+const generateLogId = (): string => {
+  return `log-${Date.now()}-${logIdCounter++}`
+}
+
+const cleanLogLine = (line: string): ParsedLogLine | null => {
+  if (!line || typeof line !== 'string') return null
+
+  // 1. Remove Docker Stream Header (8 Bytes)
   let cleaned = line
   // eslint-disable-next-line no-control-regex
   cleaned = cleaned.replace(/^[\x01\x02][\x00]{3}[\x00-\xFF]{4}/, '')
-
-  // Fallback: Entferne alle Control-Zeichen am Anfang (inkl. \x01, \x02)
   // eslint-disable-next-line no-control-regex
   cleaned = cleaned.replace(/^[\u0000-\u0008\u0001\u0002]+/, '')
 
-  // 2. Extrahiere Timestamp und Message
-  // Docker Logs mit timestamps haben Format: 2025-11-20T16:57:57.513967984Z MESSAGE
+  // 2. Extract Timestamp and Message
   const match = cleaned.match(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.\d+Z\s+(.*)/)
 
   if (!match) {
-    // Wenn kein Timestamp gefunden, versuche die Zeile direkt zu verwenden
     // eslint-disable-next-line no-control-regex
     const directMessage = cleaned.replace(/\u001b\[[0-9;]*[A-Za-z]/g, '').trim()
-    return directMessage || ''
+    if (!directMessage) return null
+    return {
+      id: generateLogId(),
+      timestamp: '',
+      message: directMessage,
+      raw: line,
+    }
   }
 
   const [, timestamp, message = ''] = match
   const formattedTimestamp = moment(timestamp).format('YYYY-MM-DD HH:mm:ss')
 
-  // 3. Entferne ANSI Escape-Sequenzen
+  // 3. Remove ANSI Escape Sequences
   // eslint-disable-next-line no-control-regex
   const cleanMessage = message.replace(/\u001b\[[0-9;]*[A-Za-z]/g, '').trim()
 
-  if (!cleanMessage) return ''
+  if (!cleanMessage) return null
 
-  // 4. Formatiere Output
-  return `${formattedTimestamp}: ${cleanMessage}`
+  return {
+    id: generateLogId(),
+    timestamp: formattedTimestamp,
+    message: cleanMessage,
+    raw: line,
+  }
 }
 
 const extractTimestamp = (line: string): number | null => {
@@ -103,21 +136,53 @@ const extractTimestamp = (line: string): number | null => {
   return null
 }
 
-const scrollToBottom = () => {
-  if (autoScroll.value && logsContainer.value) {
-    // Use requestAnimationFrame for smoother scrolling
-    requestAnimationFrame(() => {
-      if (logsContainer.value) {
-        logsContainer.value.scrollTop = logsContainer.value.scrollHeight
-      }
-    })
+// Batched log update using requestAnimationFrame for smooth UI
+const flushPendingLogs = () => {
+  if (pendingLogs.value.length === 0) {
+    rafId = null
+    return
   }
+
+  const logsToAdd = [...pendingLogs.value]
+  pendingLogs.value = []
+
+  // Deduplication based on raw content
+  const existingRaws = new Set(logs.value.slice(-200).map(l => l.raw))
+  const newLogs = logsToAdd.filter(l => !existingRaws.has(l.raw))
+
+  if (newLogs.length > 0) {
+    logs.value.push(...newLogs)
+
+    // Keep only the last maxLogLines
+    if (logs.value.length > maxLogLines) {
+      logs.value = logs.value.slice(-maxLogLines)
+    }
+
+    // Auto-scroll to bottom
+    if (autoScroll.value) {
+      nextTick(() => {
+        scrollerRef.value?.scrollToBottom()
+      })
+    }
+  }
+
+  rafId = null
+}
+
+const scheduleLogFlush = () => {
+  if (rafId === null) {
+    rafId = requestAnimationFrame(flushPendingLogs)
+  }
+}
+
+const addLogLine = (logLine: ParsedLogLine) => {
+  pendingLogs.value.push(logLine)
+  scheduleLogFlush()
 }
 
 const addLogLines = (newLogs: string[]) => {
   if (newLogs.length === 0) return
 
-  const cleanedNewLogs: string[] = []
   let maxTs = lastLogTimestamp.value
 
   for (const line of newLogs) {
@@ -125,35 +190,132 @@ const addLogLines = (newLogs: string[]) => {
     if (ts && ts > maxTs) {
       maxTs = ts
     }
-    const cleaned = cleanLogLine(line)
-    if (cleaned) {
-      cleanedNewLogs.push(cleaned)
+    const parsed = cleanLogLine(line)
+    if (parsed) {
+      pendingLogs.value.push(parsed)
     }
   }
 
   lastLogTimestamp.value = maxTs
-
-  if (cleanedNewLogs.length === 0) return
-
-  // Deduplication: Remove lines that appear in the last 100 lines of existing logs
-  // This prevents duplicates when fetching overlapping logs
-  const lookback = 100
-  const tailLogs = new Set(logs.value.slice(-lookback))
-
-  const logsToAdd = cleanedNewLogs.filter(line => !tailLogs.has(line))
-
-  if (logsToAdd.length === 0) return
-
-  logs.value.push(...logsToAdd)
-
-  // Keep only the last maxLogLines
-  if (logs.value.length > maxLogLines) {
-    logs.value = logs.value.slice(-maxLogLines)
-  }
-
-  // Auto-scroll to bottom
-  scrollToBottom()
+  scheduleLogFlush()
 }
+
+// Exponential Backoff for reconnection
+const getReconnectDelay = (): number => {
+  const baseDelay = 1000
+  const maxDelay = 30000
+  const delay = Math.min(baseDelay * Math.pow(2, reconnectAttempts.value), maxDelay)
+  return delay
+}
+
+// SSE Connection Management
+const connectSSE = () => {
+  if (!dockerStore.currentHost || eventSource.value) return
+
+  connectionStatus.value = reconnectAttempts.value > 0 ? 'reconnecting' : 'connecting'
+
+  const url = new URL('/api/containers/logs/stream', window.location.origin)
+  url.searchParams.set('hostUuid', dockerStore.currentHost.uuid)
+  url.searchParams.set('containerId', containerId.value)
+  url.searchParams.set('tail', '100')
+
+  const es = new EventSource(url.toString())
+  eventSource.value = es
+
+  es.addEventListener('connected', () => {
+    connectionStatus.value = 'connected'
+    reconnectAttempts.value = 0
+    toast.add({
+      title: 'Connected',
+      description: 'Live log stream connected',
+      color: 'success',
+    })
+  })
+
+  es.addEventListener('log', (event) => {
+    try {
+      const data = JSON.parse(event.data)
+      if (data.log) {
+        const parsed = cleanLogLine(data.log)
+        if (parsed) {
+          addLogLine(parsed)
+        }
+      }
+    }
+    catch {
+      // Ignore parse errors
+    }
+  })
+
+  es.addEventListener('close', () => {
+    disconnectSSE()
+  })
+
+  es.addEventListener('error', () => {
+    disconnectSSE()
+    if (isLiveMode.value && reconnectAttempts.value < maxReconnectAttempts) {
+      const delay = getReconnectDelay()
+      reconnectAttempts.value++
+      connectionStatus.value = 'reconnecting'
+      reconnectTimeoutId.value = setTimeout(() => {
+        if (isLiveMode.value) {
+          connectSSE()
+        }
+      }, delay)
+    }
+    else if (reconnectAttempts.value >= maxReconnectAttempts) {
+      isLiveMode.value = false
+      toast.add({
+        title: 'Disconnected',
+        description: 'Max reconnection attempts reached. Click Live to retry.',
+        color: 'warning',
+      })
+    }
+  })
+
+  es.onerror = () => {
+    if (es.readyState === EventSource.CLOSED) {
+      disconnectSSE()
+    }
+  }
+}
+
+const disconnectSSE = () => {
+  if (eventSource.value) {
+    eventSource.value.close()
+    eventSource.value = null
+  }
+  if (reconnectTimeoutId.value) {
+    clearTimeout(reconnectTimeoutId.value)
+    reconnectTimeoutId.value = null
+  }
+  connectionStatus.value = 'disconnected'
+}
+
+const toggleLiveMode = () => {
+  isLiveMode.value = !isLiveMode.value
+  if (isLiveMode.value) {
+    reconnectAttempts.value = 0
+    connectSSE()
+  }
+  else {
+    disconnectSSE()
+  }
+}
+
+// Connection status UI helpers
+const connectionStatusConfig = computed(() => {
+  switch (connectionStatus.value) {
+    case 'connected':
+      return { color: 'success' as const, icon: 'i-tabler-circle-filled', text: 'Live', pulse: true }
+    case 'connecting':
+      return { color: 'warning' as const, icon: 'i-tabler-loader-2', text: 'Connecting...', pulse: false }
+    case 'reconnecting':
+      return { color: 'warning' as const, icon: 'i-tabler-loader-2', text: `Reconnecting (${reconnectAttempts.value}/${maxReconnectAttempts})...`, pulse: false }
+    default:
+      return { color: 'neutral' as const, icon: 'i-tabler-circle', text: 'Disconnected', pulse: false }
+  }
+})
 
 const fetchLogs = async (sinceTimestamp: number = 0) => {
   if (isLogsLoading.value || !dockerStore.currentHost) return
@@ -194,34 +356,14 @@ const fetchLogs = async (sinceTimestamp: number = 0) => {
 }
 
 const refreshLogs = () => {
-  // Use the last timestamp (without adding 1s) to be safe against second-boundary issues
-  // Deduplication logic in addLogLines will handle overlaps
   fetchLogs(lastLogTimestamp.value)
 }
 
-// Handle scroll to detect user scrolling up/down
-const handleScroll = () => {
-  if (!logsContainer.value) {
-    return
-  }
-  const { scrollTop, scrollHeight, clientHeight } = logsContainer.value
-  // Enable auto-scroll if user is near the bottom (within 20px for better UX)
-  const isNearBottom = scrollTop + clientHeight >= scrollHeight - 20
-  const wasAutoScrolling = autoScroll.value
-
-  // Update auto-scroll state
-  autoScroll.value = isNearBottom
-
-  // If user scrolled back to bottom and we weren't auto-scrolling, scroll immediately
-  if (isNearBottom && !wasAutoScrolling) {
-    scrollToBottom()
-  }
-}
-
-// Watch for new logs and auto-scroll (only when auto-scroll is enabled)
-watch(() => logs.value.length, () => {
-  if (autoScroll.value) {
-    scrollToBottom()
+// Cleanup on unmount
+onUnmounted(() => {
+  disconnectSSE()
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId)
   }
 })
 
@@ -266,7 +408,7 @@ const downloadLogs = async () => {
   }
 
   if (isDownloading.value) {
-    return // Prevent multiple simultaneous downloads
+    return
   }
 
   try {
@@ -278,10 +420,9 @@ const downloadLogs = async () => {
         hostUuid: dockerStore.currentHost.uuid,
         containerId: containerId.value,
       } as DockerContainerLogsRequest,
-      timeout: 300000, // 5 minutes timeout
+      timeout: 300000,
     })
 
-    // Handle empty response
     if (!response || response.length === 0) {
       toast.add({
         title: 'Info',
@@ -291,11 +432,9 @@ const downloadLogs = async () => {
       return
     }
 
-    // Generate filename with timestamp
     const timestamp = moment().format('YYYY-MM-DDTHH-mm-ss')
     const filename = `logs-${timestamp}.log`
 
-    // Create blob and download
     const blob = new Blob([response], { type: 'text/plain' })
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -403,12 +542,41 @@ const downloadLogs = async () => {
     <!-- Logs Card -->
     <UCard>
       <template #header>
-        <div class="flex items-center justify-between">
-          <h3 class="text-lg font-semibold">
-            Container Logs
-          </h3>
-          <div class="flex gap-2">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <h3 class="text-lg font-semibold">
+              Container Logs
+            </h3>
+            <!-- Connection Status Badge -->
+            <UBadge
+              :color="connectionStatusConfig.color"
+              variant="subtle"
+              size="sm"
+              class="transition-all"
+              :class="{ 'animate-pulse-live': connectionStatusConfig.pulse }"
+            >
+              <UIcon
+                :name="connectionStatusConfig.icon"
+                class="w-3 h-3 mr-1"
+                :class="{ 'animate-spin': connectionStatus === 'connecting' || connectionStatus === 'reconnecting' }"
+              />
+              {{ connectionStatusConfig.text }}
+            </UBadge>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <!-- Live Mode Toggle -->
             <UButton
+              :icon="isLiveMode ? 'i-tabler-player-pause' : 'i-tabler-broadcast'"
+              :color="isLiveMode ? 'warning' : 'success'"
+              variant="soft"
+              size="sm"
+              @click="toggleLiveMode"
+            >
+              {{ isLiveMode ? 'Pause' : 'Live' }}
+            </UButton>
+            <!-- Refresh Button (only when not live) -->
+            <UButton
+              v-if="!isLiveMode"
               icon="i-tabler-refresh"
               color="neutral"
               variant="outline"
@@ -416,56 +584,103 @@ const downloadLogs = async () => {
               :loading="isLogsLoading"
               @click="refreshLogs"
             >
-              Refresh Logs
+              Refresh
             </UButton>
+            <!-- Download Button -->
             <UButton
               icon="i-tabler-download"
-              color="primary"
+              color="neutral"
               variant="outline"
               size="sm"
               :loading="isDownloading"
               :disabled="isDownloading"
               @click="downloadLogs"
             >
-              Download Raw Logs
+              Download
             </UButton>
           </div>
         </div>
       </template>
-      <div
-        ref="logsContainer"
-        class="w-full bg-gray-900 dark:bg-gray-100 font-mono text-sm p-4 rounded-lg overflow-auto scroll-smooth"
-        style="max-height: 600px; min-height: 400px;"
-        @scroll="handleScroll"
-      >
+
+      <!-- Logs Container with Virtual Scroller -->
+      <div class="logs-wrapper bg-gray-900 dark:bg-gray-50 rounded-lg overflow-hidden">
+        <!-- Empty State -->
         <div
           v-if="logs.length === 0 && !isLogsLoading"
-          class="text-gray-500 text-center py-8"
+          class="flex flex-col items-center justify-center py-16 text-gray-400"
         >
-          No logs available.
+          <UIcon
+            name="i-tabler-file-text"
+            class="w-12 h-12 mb-3 opacity-50"
+          />
+          <p class="text-sm">
+            No logs available
+          </p>
+          <p class="text-xs mt-1 opacity-75">
+            Start the container or click Live to stream logs
+          </p>
         </div>
+
+        <!-- Loading State -->
         <div
           v-else-if="isLogsLoading && logs.length === 0"
-          class="text-gray-500 text-center py-8"
+          class="flex flex-col items-center justify-center py-16 text-gray-400"
         >
-          Loading logs...
+          <UIcon
+            name="i-tabler-loader-2"
+            class="w-8 h-8 mb-3 animate-spin"
+          />
+          <p class="text-sm">
+            Loading logs...
+          </p>
         </div>
-        <div
+
+        <!-- Virtual Scroller for Logs -->
+        <DynamicScroller
           v-else
-          class="space-y-0.5"
+          ref="scrollerRef"
+          :items="logs"
+          :min-item-size="24"
+          key-field="id"
+          class="log-scroller"
+          style="height: 500px;"
         >
-          <div
-            v-for="(log, index) in logs"
-            :key="index"
-            class="wrap-break-word text-white dark:text-black transition-colors"
-          >
-            {{ log }}
-          </div>
-        </div>
+          <template #default="{ item, index, active }">
+            <DynamicScrollerItem
+              :item="item"
+              :active="active"
+              :data-index="index"
+            >
+              <ContainerLogLine
+                :timestamp="item.timestamp"
+                :message="item.message"
+                :index="index"
+              />
+            </DynamicScrollerItem>
+          </template>
+        </DynamicScroller>
       </div>
+
       <template #footer>
         <div class="flex items-center justify-between text-xs text-gray-500">
-          <span>{{ logs.length }} / {{ maxLogLines }} lines</span>
+          <div class="flex items-center gap-4">
+            <span>{{ logs.length.toLocaleString() }} / {{ maxLogLines.toLocaleString() }} lines</span>
+            <label class="flex items-center gap-1.5 cursor-pointer select-none">
+              <input
+                v-model="autoScroll"
+                type="checkbox"
+                class="w-3.5 h-3.5 rounded border-gray-400 text-primary-500 focus:ring-primary-500 focus:ring-offset-0"
+              >
+              <span>Auto-scroll</span>
+            </label>
+          </div>
+          <div
+            v-if="isLiveMode && connectionStatus === 'connected'"
+            class="flex items-center gap-1.5 text-green-500"
+          >
+            <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <span>Streaming</span>
+          </div>
         </div>
       </template>
     </UCard>
@@ -473,5 +688,17 @@ const downloadLogs = async () => {
 </template>
 
 <style lang="scss" scoped>
+.logs-wrapper {
+  border: 1px solid rgba(255, 255, 255, 0.1);
 
+  :root.dark & {
+    border-color: rgba(0, 0, 0, 0.1);
+  }
+}
+
+.log-scroller {
+  :deep(.vue-recycle-scroller__item-wrapper) {
+    overflow: visible;
+  }
+}
 </style>
