@@ -51,7 +51,7 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>) =>
       method: 'GET',
       headers: {
         'x-auth-key': dockerHost.authKey,
-        Accept: 'text/event-stream',
+        'Accept': 'text/event-stream',
       },
       signal: controller.signal,
     })

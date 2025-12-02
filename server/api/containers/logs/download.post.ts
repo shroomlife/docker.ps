@@ -35,7 +35,7 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>) =>
       timeout: 300000, // 5 minutes timeout for large log files
       maxContentLength: Infinity,
       maxBodyLength: Infinity,
-      validateStatus: (status) => status >= 200 && status < 300,
+      validateStatus: status => status >= 200 && status < 300,
     })
 
     // Check if response contains an error (from agent)
@@ -87,4 +87,3 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>) =>
     })
   }
 })
-
