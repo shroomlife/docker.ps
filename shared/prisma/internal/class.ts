@@ -17,18 +17,26 @@ import type * as Prisma from "./prismaNamespace.js"
 
 const config: runtime.GetPrismaClientConfig = {
   "previewFeatures": [],
-  "clientVersion": "7.0.0",
-  "engineVersion": "0c19ccc313cf9911a90d99d2ac2eb0280c76c513",
+  "clientVersion": "7.4.2",
+  "engineVersion": "94a226be1cf2967af2541cca5529f0f7ba866919",
   "activeProvider": "postgresql",
   "inlineSchema": "generator client {\n  provider = \"prisma-client\"\n  output   = \"../shared/prisma\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n}\n\nmodel User {\n  id        Int      @id @default(autoincrement())\n  uuid      String   @unique @default(uuid())\n  isActive  Boolean  @default(true)\n  createdAt DateTime @default(now())\n\n  identities  UserIdentity[]\n  dockerHosts DockerHost[]\n}\n\nenum UserIdentityType {\n  EMAIL\n  GOOGLE\n}\n\nmodel UserIdentity {\n  id         Int              @id @default(autoincrement())\n  uuid       String           @unique @default(uuid())\n  type       UserIdentityType\n  externalId String?\n\n  email    String? @db.VarChar(255)\n  password String?\n\n  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)\n  userId Int\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@unique([type, externalId]) // pro Provider eindeutig\n  @@unique([userId, type]) // pro User nur eine Identität je Provider\n  @@index([userId])\n}\n\nmodel DockerHost {\n  id   Int    @id @default(autoincrement())\n  uuid String @unique @default(uuid())\n\n  name String @db.VarChar(255)\n  url  String\n\n  authKey String @db.VarChar(255)\n\n  isActive Boolean @default(true)\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)\n  userId Int\n}\n",
   "runtimeDataModel": {
     "models": {},
     "enums": {},
     "types": {}
+  },
+  "parameterizationSchema": {
+    "strings": [],
+    "graph": ""
   }
 }
 
 config.runtimeDataModel = JSON.parse("{\"models\":{\"User\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"uuid\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"isActive\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"identities\",\"kind\":\"object\",\"type\":\"UserIdentity\",\"relationName\":\"UserToUserIdentity\"},{\"name\":\"dockerHosts\",\"kind\":\"object\",\"type\":\"DockerHost\",\"relationName\":\"DockerHostToUser\"}],\"dbName\":null},\"UserIdentity\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"uuid\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"type\",\"kind\":\"enum\",\"type\":\"UserIdentityType\"},{\"name\":\"externalId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"email\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"password\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"user\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"UserToUserIdentity\"},{\"name\":\"userId\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"}],\"dbName\":null},\"DockerHost\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"uuid\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"url\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"authKey\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"isActive\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"user\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"DockerHostToUser\"},{\"name\":\"userId\",\"kind\":\"scalar\",\"type\":\"Int\"}],\"dbName\":null}},\"enums\":{},\"types\":{}}")
+config.parameterizationSchema = {
+  strings: JSON.parse("[\"where\",\"orderBy\",\"cursor\",\"user\",\"identities\",\"dockerHosts\",\"_count\",\"User.findUnique\",\"User.findUniqueOrThrow\",\"User.findFirst\",\"User.findFirstOrThrow\",\"User.findMany\",\"data\",\"User.createOne\",\"User.createMany\",\"User.createManyAndReturn\",\"User.updateOne\",\"User.updateMany\",\"User.updateManyAndReturn\",\"create\",\"update\",\"User.upsertOne\",\"User.deleteOne\",\"User.deleteMany\",\"having\",\"_avg\",\"_sum\",\"_min\",\"_max\",\"User.groupBy\",\"User.aggregate\",\"UserIdentity.findUnique\",\"UserIdentity.findUniqueOrThrow\",\"UserIdentity.findFirst\",\"UserIdentity.findFirstOrThrow\",\"UserIdentity.findMany\",\"UserIdentity.createOne\",\"UserIdentity.createMany\",\"UserIdentity.createManyAndReturn\",\"UserIdentity.updateOne\",\"UserIdentity.updateMany\",\"UserIdentity.updateManyAndReturn\",\"UserIdentity.upsertOne\",\"UserIdentity.deleteOne\",\"UserIdentity.deleteMany\",\"UserIdentity.groupBy\",\"UserIdentity.aggregate\",\"DockerHost.findUnique\",\"DockerHost.findUniqueOrThrow\",\"DockerHost.findFirst\",\"DockerHost.findFirstOrThrow\",\"DockerHost.findMany\",\"DockerHost.createOne\",\"DockerHost.createMany\",\"DockerHost.createManyAndReturn\",\"DockerHost.updateOne\",\"DockerHost.updateMany\",\"DockerHost.updateManyAndReturn\",\"DockerHost.upsertOne\",\"DockerHost.deleteOne\",\"DockerHost.deleteMany\",\"DockerHost.groupBy\",\"DockerHost.aggregate\",\"AND\",\"OR\",\"NOT\",\"id\",\"uuid\",\"name\",\"url\",\"authKey\",\"isActive\",\"createdAt\",\"updatedAt\",\"userId\",\"equals\",\"in\",\"notIn\",\"lt\",\"lte\",\"gt\",\"gte\",\"not\",\"contains\",\"startsWith\",\"endsWith\",\"UserIdentityType\",\"type\",\"externalId\",\"email\",\"password\",\"every\",\"some\",\"none\",\"type_externalId\",\"userId_type\",\"is\",\"isNot\",\"connectOrCreate\",\"upsert\",\"createMany\",\"set\",\"disconnect\",\"delete\",\"connect\",\"updateMany\",\"deleteMany\",\"increment\",\"decrement\",\"multiply\",\"divide\"]"),
+  graph: "uQEgMAkEAABsACAFAABtACA_AABnADBAAAAOABBBAABnADBCAgAAAAFDAQAAAAFHIABqACFIQABrACEBAAAAAQAgDQMAAG8AID8AAHIAMEAAAAMAEEEAAHIAMEICAGgAIUMBAGkAIUhAAGsAIUlAAGsAIUoCAGgAIVcAAHNXIlgBAHQAIVkBAHQAIVoBAHQAIQQDAACtAQAgWAAAgAEAIFkAAIABACBaAACAAQAgDwMAAG8AID8AAHIAMEAAAAMAEEEAAHIAMEICAAAAAUMBAAAAAUhAAGsAIUlAAGsAIUoCAGgAIVcAAHNXIlgBAHQAIVkBAHQAIVoBAHQAIV4AAHAAIF8AAHEAIAMAAAADACABAAAEADACAAAFACANAwAAbwAgPwAAbgAwQAAABwAQQQAAbgAwQgIAaAAhQwEAaQAhRAEAaQAhRQEAaQAhRgEAaQAhRyAAagAhSEAAawAhSUAAawAhSgIAaAAhAQMAAK0BACANAwAAbwAgPwAAbgAwQAAABwAQQQAAbgAwQgIAAAABQwEAAAABRAEAaQAhRQEAaQAhRgEAaQAhRyAAagAhSEAAawAhSUAAawAhSgIAaAAhAwAAAAcAIAEAAAgAMAIAAAkAIAEAAAADACABAAAABwAgAQAAAAEAIAkEAABsACAFAABtACA_AABnADBAAAAOABBBAABnADBCAgBoACFDAQBpACFHIABqACFIQABrACECBAAAqwEAIAUAAKwBACADAAAADgAgAQAADwAwAgAAAQAgAwAAAA4AIAEAAA8AMAIAAAEAIAMAAAAOACABAAAPADACAAABACAGBAAAqQEAIAUAAKoBACBCAgAAAAFDAQAAAAFHIAAAAAFIQAAAAAEBDAAAEwAgBEICAAAAAUMBAAAAAUcgAAAAAUhAAAAAAQEMAAAVADABDAAAFQAwBgQAAI8BACAFAACQAQAgQgIAfQAhQwEAegAhRyAAewAhSEAAfAAhAgAAAAEAIAwAABgAIARCAgB9ACFDAQB6ACFHIAB7ACFIQAB8ACECAAAADgAgDAAAGgAgAgAAAA4AIAwAABoAIAMAAAABACATAAATACAUAAAYACABAAAAAQAgAQAAAA4AIAUGAACKAQAgGQAAiwEAIBoAAI4BACAbAACNAQAgHAAAjAEAIAc_AABmADBAAAAhABBBAABmADBCAgBRACFDAQBSACFHIABTACFIQABUACEDAAAADgAgAQAAIAAwGAAAIQAgAwAAAA4AIAEAAA8AMAIAAAEAIAEAAAAFACABAAAABQAgAwAAAAMAIAEAAAQAMAIAAAUAIAMAAAADACABAAAEADACAAAFACADAAAAAwAgAQAABAAwAgAABQAgCgMAAIkBACBCAgAAAAFDAQAAAAFIQAAAAAFJQAAAAAFKAgAAAAFXAAAAVwJYAQAAAAFZAQAAAAFaAQAAAAEBDAAAKQAgCUICAAAAAUMBAAAAAUhAAAAAAUlAAAAAAUoCAAAAAVcAAABXAlgBAAAAAVkBAAAAAVoBAAAAAQEMAAArADABDAAAKwAwCgMAAIgBACBCAgB9ACFDAQB6ACFIQAB8ACFJQAB8ACFKAgB9ACFXAACGAVciWAEAhwEAIVkBAIcBACFaAQCHAQAhAgAAAAUAIAwAAC4AIAlCAgB9ACFDAQB6ACFIQAB8ACFJQAB8ACFKAgB9ACFXAACGAVciWAEAhwEAIVkBAIcBACFaAQCHAQAhAgAAAAMAIAwAADAAIAIAAAADACAMAAAwACADAAAABQAgEwAAKQAgFAAALgAgAQAAAAUAIAEAAAADACAIBgAAgQEAIBkAAIIBACAaAACFAQAgGwAAhAEAIBwAAIMBACBYAACAAQAgWQAAgAEAIFoAAIABACAMPwAAXgAwQAAANwAQQQAAXgAwQgIAUQAhQwEAUgAhSEAAVAAhSUAAVAAhSgIAUQAhVwAAX1ciWAEAYAAhWQEAYAAhWgEAYAAhAwAAAAMAIAEAADYAMBgAADcAIAMAAAADACABAAAEADACAAAFACABAAAACQAgAQAAAAkAIAMAAAAHACABAAAIADACAAAJACADAAAABwAgAQAACAAwAgAACQAgAwAAAAcAIAEAAAgAMAIAAAkAIAoDAAB_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_AABmADBAAAAhABBBAABmADBCAgBRACFDAQBSACFHIABTACFIQABUACEJBAAAbAAgBQAAbQAgPwAAZwAwQAAADgAQQQAAZwAwQgIAaAAhQwEAaQAhRyAAagAhSEAAawAhCEsCAAAAAUwCAAAABE0CAAAABE4CAAAAAU8CAAAAAVACAAAAAVECAAAAAVICAFYAIQtLAQAAAAFMAQAAAARNAQAAAAROAQAAAAFPAQAAAAFQAQAAAAFRAQAAAAFSAQBbACFTAQAAAAFUAQAAAAFVAQAAAAECSyAAAAABUiAAWQAhCEtAAAAAAUxAAAAABE1AAAAABE5AAAAAAU9AAAAAAVBAAAAAAVFAAAAAAVJAAFcAIQNbAAADACBcAAADACBdAAADACADWwAABwAgXAAABwAgXQAABwAgDQMAAG8AID8AAG4AMEAAAAcAEEEAAG4AMEICAGgAIUMBAGkAIUQBAGkAIUUBAGkAIUYBAGkAIUcgAGoAIUhAAGsAIUlAAGsAIUoCAGgAIQsEAABsACAFAABtACA_AABnADBAAAAOABBBAABnADBCAgBoACFDAQBpACFHIABqACFIQABrACFgAAAOACBhAAAOACACVwAAAFcCWAEAAAABAkoCAAAAAVcAAABXAg0DAABvACA_AAByADBAAAADABBBAAByADBCAgBoACFDAQBpACFIQABrACFJQABrACFKAgBoACFXAABzVyJYAQB0ACFZAQB0ACFaAQB0ACEESwAAAFcCTAAAAFcITQAAAFcIUgAAZVciC0sBAAAAAUwBAAAABU0BAAAABU4BAAAAAU8BAAAAAVABAAAAAVEBAAAAAVIBAGMAIVMBAAAAAVQBAAAAAVUBAAAAAQAAAAAAAWUBAAAAAQFlIAAAAAEBZUAAAAABBWUCAAAAAWsCAAAAAWwCAAAAAW0CAAAAAW4CAAAAAQUTAAC1AQAgFAAAuAEAIGIAALYBACBjAAC3AQAgaAAAAQAgAxMAALUBACBiAAC2AQAgaAAAAQAgAAAAAAAAAWUAAABXAgFlAQAAAAEFEwAAsAEAIBQAALMBACBiAACxAQAgYwAAsgEAIGgAAAEAIAMTAACwAQAgYgAAsQEAIGgAAAEAIAAAAAAACxMAAJ0BADAUAACiAQAwYgAAngEAMGMAAJ8BADBkAACgAQAgZQAAoQEAMGYAAKEBADBnAAChAQAwaAAAoQEAMGkAAKMBADBqAACkAQAwCxMAAJEBADAUAACWAQAwYgAAkgEAMGMAAJMBADBkAACUAQAgZQAAlQEAMGYAAJUBADBnAACVAQAwaAAAlQEAMGkAAJcBADBqAACYAQAwCEICAAAAAUMBAAAAAUQBAAAAAUUBAAAAAUYBAAAAAUcgAAAAAUhAAAAAAUlAAAAAAQIAAAAJACATAACcAQAgAwAAAAkAIBMAAJwBACAUAACbAQAgAQwAAK8BADANAwAAbwAgPwAAbgAwQAAABwAQQQAAbgAwQgIAAAABQwEAAAABRAEAaQAhRQEAaQAhRgEAaQAhRyAAagAhSEAAawAhSUAAawAhSgIAaAAhAgAAAAkAIAwAAJsBACACAAAAmQEAIAwAAJoBACAMPwAAmAEAMEAAAJkBABBBAACYAQAwQgIAaAAhQwEAaQAhRAEAaQAhRQEAaQAhRgEAaQAhRyAAagAhSEAAawAhSUAAawAhSgIAaAAhDD8AAJgBADBAAACZAQAQQQAAmAEAMEICAGgAIUMBAGkAIUQBAGkAIUUBAGkAIUYBAGkAIUcgAGoAIUhAAGsAIUlAAGsAIUoCAGgAIQhCAgB9ACFDAQB6ACFEAQB6ACFFAQB6ACFGAQB6ACFHIAB7ACFIQAB8ACFJQAB8ACEIQgIAfQAhQwEAegAhRAEAegAhRQEAegAhRgEAegAhRyAAewAhSEAAfAAhSUAAfAAhCEICAAAAAUMBAAAAAUQBAAAAAUUBAAAAAUYBAAAAAUcgAAAAAUhAAAAAAUlAAAAAAQhCAgAAAAFDAQAAAAFIQAAAAAFJQAAAAAFXAAAAVwJYAQAAAAFZAQAAAAFaAQAAAAECAAAABQAgEwAAqAEAIAMAAAAFACATAACoAQAgFAAApwEAIAEMAACuAQAwDwMAAG8AID8AAHIAMEAAAAMAEEEAAHIAMEICAAAAAUMBAAAAAUhAAGsAIUlAAGsAIUoCAGgAIVcAAHNXIlgBAHQAIVkBAHQAIVoBAHQAIV4AAHAAIF8AAHEAIAIAAAAFACAMAACnAQAgAgAAAKUBACAMAACmAQAgDD8AAKQBADBAAAClAQAQQQAApAEAMEICAGgAIUMBAGkAIUhAAGsAIUlAAGsAIUoCAGgAIVcAAHNXIlgBAHQAIVkBAHQAIVoBAHQAIQw_AACkAQAwQAAApQEAEEEAAKQBADBCAgBoACFDAQBpACFIQABrACFJQABrACFKAgBoACFXAABzVyJYAQB0ACFZAQB0ACFaAQB0ACEIQgIAfQAhQwEAegAhSEAAfAAhSUAAfAAhVwAAhgFXIlgBAIcBACFZAQCHAQAhWgEAhwEAIQhCAgB9ACFDAQB6ACFIQAB8ACFJQAB8ACFXAACGAVciWAEAhwEAIVkBAIcBACFaAQCHAQAhCEICAAAAAUMBAAAAAUhAAAAAAUlAAAAAAVcAAABXAlgBAAAAAVkBAAAAAVoBAAAAAQQTAACdAQAwYgAAngEAMGQAAKABACBoAAChAQAwBBMAAJEBADBiAACSAQAwZAAAlAEAIGgAAJUBADAAAAIEAACrAQAgBQAArAEAIAhCAgAAAAFDAQAAAAFIQAAAAAFJQAAAAAFXAAAAVwJYAQAAAAFZAQAAAAFaAQAAAAEIQgIAAAABQwEAAAABRAEAAAABRQEAAAABRgEAAAABRyAAAAABSEAAAAABSUAAAAABBQUAAKoBACBCAgAAAAFDAQAAAAFHIAAAAAFIQAAAAAECAAAAAQAgEwAAsAEAIAMAAAAOACATAACwAQAgFAAAtAEAIAcAAAAOACAFAACQAQAgDAAAtAEAIEICAH0AIUMBAHoAIUcgAHsAIUhAAHwAIQUFAACQAQAgQgIAfQAhQwEAegAhRyAAewAhSEAAfAAhBQQAAKkBACBCAgAAAAFDAQAAAAFHIAAAAAFIQAAAAAECAAAAAQAgEwAAtQEAIAMAAAAOACATAAC1AQAgFAAAuQEAIAcAAAAOACAEAACPAQAgDAAAuQEAIEICAH0AIUMBAHoAIUcgAHsAIUhAAHwAIQUEAACPAQAgQgIAfQAhQwEAegAhRyAAewAhSEAAfAAhAwQGAgUKAwYABAEDAAEBAwABAgQLAAUMAAAAAAUGAAkZAAoaAAsbAAwcAA0AAAAAAAUGAAkZAAoaAAsbAAwcAA0BAwABAQMAAQUGABIZABMaABQbABUcABYAAAAAAAUGABIZABMaABQbABUcABYBAwABAQMAAQUGABsZABwaAB0bAB4cAB8AAAAAAAUGABsZABwaAB0bAB4cAB8HAgEIDQEJEAEKEQELEgENFAEOFgUPFwYQGQERGwUSHAcVHQEWHgEXHwUdIggeIw4fJAIgJQIhJgIiJwIjKAIkKgIlLAUmLQ8nLwIoMQUpMhAqMwIrNAIsNQUtOBEuORcvOgMwOwMxPAMyPQMzPgM0QAM1QgU2Qxg3RQM4RwU5SBk6SQM7SgM8SwU9Tho-TyA"
+}
 
 async function decodeBase64AsWasm(wasmBase64: string): Promise<WebAssembly.Module> {
   const { Buffer } = await import('node:buffer')
@@ -37,12 +45,14 @@ async function decodeBase64AsWasm(wasmBase64: string): Promise<WebAssembly.Modul
 }
 
 config.compilerWasm = {
-  getRuntime: async () => await import("@prisma/client/runtime/query_compiler_bg.postgresql.mjs"),
+  getRuntime: async () => await import("@prisma/client/runtime/query_compiler_fast_bg.postgresql.mjs"),
 
   getQueryCompilerWasmModule: async () => {
-    const { wasm } = await import("@prisma/client/runtime/query_compiler_bg.postgresql.wasm-base64.mjs")
+    const { wasm } = await import("@prisma/client/runtime/query_compiler_fast_bg.postgresql.wasm-base64.mjs")
     return await decodeBase64AsWasm(wasm)
-  }
+  },
+
+  importName: "./query_compiler_fast_bg.js"
 }
 
 
@@ -57,12 +67,14 @@ export interface PrismaClientConstructor {
    * Type-safe database client for TypeScript
    * @example
    * ```
-   * const prisma = new PrismaClient()
+   * const prisma = new PrismaClient({
+   *   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL })
+   * })
    * // Fetch zero or more Users
    * const users = await prisma.user.findMany()
    * ```
    * 
-   * Read more in our [docs](https://www.prisma.io/docs/reference/tools-and-interfaces/prisma-client).
+   * Read more in our [docs](https://pris.ly/d/client).
    */
 
   new <
@@ -79,12 +91,14 @@ export interface PrismaClientConstructor {
  * Type-safe database client for TypeScript
  * @example
  * ```
- * const prisma = new PrismaClient()
+ * const prisma = new PrismaClient({
+ *   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL })
+ * })
  * // Fetch zero or more Users
  * const users = await prisma.user.findMany()
  * ```
  * 
- * Read more in our [docs](https://www.prisma.io/docs/reference/tools-and-interfaces/prisma-client).
+ * Read more in our [docs](https://pris.ly/d/client).
  */
 
 export interface PrismaClient<
@@ -113,7 +127,7 @@ export interface PrismaClient<
    * const result = await prisma.$executeRaw`UPDATE User SET cool = ${true} WHERE email = ${'user@email.com'};`
    * ```
    *
-   * Read more in our [docs](https://www.prisma.io/docs/reference/tools-and-interfaces/prisma-client/raw-database-access).
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
    */
   $executeRaw<T = unknown>(query: TemplateStringsArray | Prisma.Sql, ...values: any[]): Prisma.PrismaPromise<number>;
 
@@ -125,7 +139,7 @@ export interface PrismaClient<
    * const result = await prisma.$executeRawUnsafe('UPDATE User SET cool = $1 WHERE email = $2 ;', true, 'user@email.com')
    * ```
    *
-   * Read more in our [docs](https://www.prisma.io/docs/reference/tools-and-interfaces/prisma-client/raw-database-access).
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
    */
   $executeRawUnsafe<T = unknown>(query: string, ...values: any[]): Prisma.PrismaPromise<number>;
 
@@ -136,7 +150,7 @@ export interface PrismaClient<
    * const result = await prisma.$queryRaw`SELECT * FROM User WHERE id = ${1} OR email = ${'user@email.com'};`
    * ```
    *
-   * Read more in our [docs](https://www.prisma.io/docs/reference/tools-and-interfaces/prisma-client/raw-database-access).
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
    */
   $queryRaw<T = unknown>(query: TemplateStringsArray | Prisma.Sql, ...values: any[]): Prisma.PrismaPromise<T>;
 
@@ -148,7 +162,7 @@ export interface PrismaClient<
    * const result = await prisma.$queryRawUnsafe('SELECT * FROM User WHERE id = $1 OR email = $2;', 1, 'user@email.com')
    * ```
    *
-   * Read more in our [docs](https://www.prisma.io/docs/reference/tools-and-interfaces/prisma-client/raw-database-access).
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
    */
   $queryRawUnsafe<T = unknown>(query: string, ...values: any[]): Prisma.PrismaPromise<T>;
 
@@ -164,7 +178,7 @@ export interface PrismaClient<
    * ])
    * ```
    * 
-   * Read more in our [docs](https://www.prisma.io/docs/concepts/components/prisma-client/transactions).
+   * Read more in our [docs](https://www.prisma.io/docs/orm/prisma-client/queries/transactions).
    */
   $transaction<P extends Prisma.PrismaPromise<any>[]>(arg: [...P], options?: { isolationLevel?: Prisma.TransactionIsolationLevel }): runtime.Types.Utils.JsPromise<runtime.Types.Utils.UnwrapTuple<P>>
 

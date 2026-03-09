@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-export type * from './models/User.ts'
-export type * from './models/UserIdentity.ts'
-export type * from './models/DockerHost.ts'
-export type * from './commonInputTypes.ts'
+export type * from './models/User.js'
+export type * from './models/UserIdentity.js'
+export type * from './models/DockerHost.js'
+export type * from './commonInputTypes.js'

@@ -1,7 +1,10 @@
 import axios from 'axios'
 import type { H3Event, EventHandlerRequest } from 'h3'
 
-export default defineEventHandler(async (event: H3Event<EventHandlerRequest>) => {
+import type { DockerContainerLogsResponse } from '~~/shared/types/docker'
+import { parseDockerLogEntries } from '~~/shared/utils/dockerLogs'
+
+export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): Promise<DockerContainerLogsResponse> => {
   const user = await AuthService.getUserOrFail(event)
   const body = await readBody(event) as DockerContainerLogsRequest
 
@@ -21,12 +24,10 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>) =>
   }
 
   const tail = body.tail ?? 1000
-  const since = body.since ?? 0
 
   // Build URL with query parameters
   const url = new URL(`/containers/${body.containerId}/logs`, dockerHost.url)
   url.searchParams.set('tail', tail.toString())
-  url.searchParams.set('since', since.toString())
 
   // Non-streaming mode
   const logsResponse = await axios<{ logs: string[] }>({
@@ -37,5 +38,7 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>) =>
     },
   })
 
-  return logsResponse.data
+  return {
+    logs: parseDockerLogEntries(logsResponse.data.logs, `poll-${body.containerId}`),
+  }
 })

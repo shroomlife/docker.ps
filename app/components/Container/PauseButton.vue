@@ -1,6 +1,9 @@
 <script lang="ts" setup>
 const dockerStore = useDockerStore()
 const toast = useToast()
+const emit = defineEmits<{
+  success: []
+}>()
 
 const { id } = defineProps({
   id: {
@@ -24,6 +27,7 @@ const pauseContainer = async () => {
       } as DockerContainerPauseRequest,
     })
     dockerStore.updateContainer(pausedContainer)
+    emit('success')
   }
   catch (error) {
     console.error('Failed to pause container:', error)

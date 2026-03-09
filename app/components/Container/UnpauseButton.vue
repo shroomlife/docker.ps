@@ -1,6 +1,9 @@
 <script lang="ts" setup>
 const dockerStore = useDockerStore()
 const toast = useToast()
+const emit = defineEmits<{
+  success: []
+}>()
 
 const { id } = defineProps({
   id: {
@@ -24,6 +27,7 @@ const startContainer = async () => {
       } as DockerContainerUnpauseRequest,
     })
     dockerStore.updateContainer(unpausedContainer)
+    emit('success')
   }
   catch (error) {
     console.error('Failed to unpause container:', error)

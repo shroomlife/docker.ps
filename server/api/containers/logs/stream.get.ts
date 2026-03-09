@@ -1,6 +1,60 @@
 import type { H3Event, EventHandlerRequest } from 'h3'
 import { createEventStream } from 'h3'
 
+import { createDockerLogIdPrefix, parseDockerLogEntry } from '~~/shared/utils/dockerLogs'
+
+interface ParsedSseEvent {
+  event: string
+  data: string
+}
+
+const serializeSseEvent = (eventName: string, payload: unknown): string => {
+  const data = typeof payload === 'string'
+    ? payload
+    : JSON.stringify(payload)
+
+  return `event: ${eventName}\ndata: ${data}\n\n`
+}
+
+const parseSseBlock = (block: string): ParsedSseEvent | null => {
+  const lines = block.split('\n')
+  let eventName = 'message'
+  const dataLines: string[] = []
+
+  for (const line of lines) {
+    if (!line || line.startsWith(':')) {
+      continue
+    }
+
+    if (line.startsWith('event:')) {
+      eventName = line.slice(6).trim() || 'message'
+      continue
+    }
+
+    if (line.startsWith('data:')) {
+      dataLines.push(line.slice(5).trimStart())
+    }
+  }
+
+  if (dataLines.length === 0) {
+    return null
+  }
+
+  return {
+    event: eventName,
+    data: dataLines.join('\n'),
+  }
+}
+
+const parseSsePayload = (payload: string): unknown => {
+  try {
+    return JSON.parse(payload)
+  }
+  catch {
+    return payload
+  }
+}
+
 export default defineEventHandler(async (event: H3Event<EventHandlerRequest>) => {
   const user = await AuthService.getUserOrFail(event)
   const query = getQuery(event)
@@ -24,23 +78,19 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>) =>
     throw createError({ statusCode: 404, statusMessage: 'Docker Host Not Found' })
   }
 
-  // Build URL for agent SSE endpoint
   const url = new URL(`/containers/${containerId}/logs/stream`, dockerHost.url)
   url.searchParams.set('tail', tail)
 
-  // Set SSE headers
   setHeader(event, 'Content-Type', 'text/event-stream')
   setHeader(event, 'Cache-Control', 'no-cache')
   setHeader(event, 'Connection', 'keep-alive')
   setHeader(event, 'X-Accel-Buffering', 'no')
 
-  // Create event stream for the client
   const eventStream = createEventStream(event)
-
-  // Connect to agent SSE endpoint
   const controller = new AbortController()
+  const idPrefix = createDockerLogIdPrefix(`stream-${containerId}`)
+  let logIndex = 0
 
-  // Clean up on client disconnect
   event.node.req.on('close', () => {
     controller.abort()
     eventStream.close()
@@ -51,7 +101,7 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>) =>
       method: 'GET',
       headers: {
         'x-auth-key': dockerHost.authKey,
-        'Accept': 'text/event-stream',
+        'accept': 'text/event-stream',
       },
       signal: controller.signal,
     })
@@ -70,25 +120,58 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>) =>
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
 
-    // Read and forward SSE events
+    const handleBlock = async (block: string) => {
+      const parsedEvent = parseSseBlock(block)
+      if (!parsedEvent) {
+        return
+      }
+
+      if (parsedEvent.event === 'log') {
+        const payload = parseSsePayload(parsedEvent.data) as { log?: string }
+        if (!payload.log) {
+          return
+        }
+
+        const normalizedLog = parseDockerLogEntry(payload.log, idPrefix, logIndex++)
+        if (!normalizedLog) {
+          return
+        }
+
+        await eventStream.push(serializeSseEvent('log', normalizedLog))
+        return
+      }
+
+      await eventStream.push(serializeSseEvent(parsedEvent.event, parseSsePayload(parsedEvent.data)))
+    }
+
     const readStream = async () => {
+      let buffer = ''
+
       try {
         while (true) {
           const { done, value } = await reader.read()
           if (done) {
-            await eventStream.push('event: close\ndata: {"status":"stream_ended"}\n\n')
+            if (buffer.trim()) {
+              await handleBlock(buffer)
+            }
             break
           }
 
-          const text = decoder.decode(value, { stream: true })
-          // Forward raw SSE data directly
-          await eventStream.push(text)
+          buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n')
+
+          let separatorIndex = buffer.indexOf('\n\n')
+          while (separatorIndex !== -1) {
+            const block = buffer.slice(0, separatorIndex)
+            buffer = buffer.slice(separatorIndex + 2)
+            await handleBlock(block)
+            separatorIndex = buffer.indexOf('\n\n')
+          }
         }
       }
-      catch (error) {
-        if ((error as Error).name !== 'AbortError') {
-          console.error('SSE stream error:', error)
-          await eventStream.push(`event: error\ndata: ${JSON.stringify({ error: 'Stream error' })}\n\n`)
+      catch (streamError) {
+        if ((streamError as Error).name !== 'AbortError') {
+          console.error('SSE stream error:', streamError)
+          await eventStream.push(serializeSseEvent('error', { error: 'Stream error' }))
         }
       }
       finally {
@@ -96,16 +179,16 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>) =>
       }
     }
 
-    // Start reading in background
-    readStream()
+    void readStream()
 
     return eventStream.send()
   }
-  catch (error) {
-    if ((error as Error).name === 'AbortError') {
+  catch (streamError) {
+    if ((streamError as Error).name === 'AbortError') {
       return
     }
-    console.error('Failed to connect to agent SSE:', error)
+
+    console.error('Failed to connect to agent SSE:', streamError)
     throw createError({
       statusCode: 502,
       statusMessage: 'Failed to connect to Docker agent',

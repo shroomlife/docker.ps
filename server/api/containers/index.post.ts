@@ -1,8 +1,9 @@
-import type { ContainerInspectInfo } from 'dockerode'
 import type { H3Event, EventHandlerRequest } from 'h3'
 import axios from 'axios'
 
-export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): Promise<ContainerInspectInfo> => {
+import type { DockerContainerDetails } from '~~/shared/types/docker'
+
+export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): Promise<DockerContainerDetails> => {
   const user = await AuthService.getUserOrFail(event)
   const body = await readBody(event) as DockerContainerGetRequest
   if (!body.hostUuid || !body.containerId) {
@@ -20,7 +21,7 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): P
     throw createError({ statusCode: 404, statusMessage: 'Docker Host Not Found' })
   }
 
-  const remoteDockerContainer = await axios<ContainerInspectInfo>({
+  const remoteDockerContainer = await axios({
     method: 'GET',
     url: new URL(`/containers/${body.containerId}`, dockerHost.url).toString(),
     headers: {
@@ -28,5 +29,5 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): P
     },
   })
 
-  return remoteDockerContainer.data
+  return DockerService.simplifyContainerDetails(remoteDockerContainer.data)
 })

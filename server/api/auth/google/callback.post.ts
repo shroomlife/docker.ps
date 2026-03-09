@@ -3,6 +3,8 @@ import { timingSafeEqual } from 'crypto'
 import axios from 'axios'
 import jwt from 'jsonwebtoken'
 
+import { UserIdentityType } from '~~/shared/prisma/enums'
+
 export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): Promise<User> => {
   try {
     const cookie = getCookie(event, AuthSettings.googleCookieName) as string | undefined

@@ -1,6 +1,9 @@
 <script lang="ts" setup>
 const dockerStore = useDockerStore()
 const toast = useToast()
+const emit = defineEmits<{
+  success: []
+}>()
 
 const { id } = defineProps({
   id: {
@@ -25,6 +28,7 @@ const removeContainer = async () => {
     })
     if (isRemoved) {
       dockerStore.removeContainer(id)
+      emit('success')
     }
   }
   catch (error) {

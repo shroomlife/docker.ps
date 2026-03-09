@@ -1,8 +1,9 @@
 <script lang="ts" setup>
 export interface LogLineProps {
-  timestamp: string
+  timestamp?: string
   message: string
   index: number
+  wrapLines?: boolean
 }
 
 defineProps<LogLineProps>()
@@ -14,9 +15,12 @@ defineProps<LogLineProps>()
     :class="{ 'bg-white/2 dark:bg-black/2': index % 2 === 0 }"
   >
     <span class="timestamp shrink-0 text-gray-500 dark:text-gray-400 tabular-nums">
-      {{ timestamp }}
+      {{ timestamp || '--' }}
     </span>
-    <span class="message text-gray-100 dark:text-gray-800 break-all whitespace-pre-wrap">
+    <span
+      class="message text-gray-100 dark:text-gray-800"
+      :class="wrapLines ? 'break-all whitespace-pre-wrap' : 'whitespace-pre'"
+    >
       {{ message }}
     </span>
   </div>
@@ -41,5 +45,9 @@ defineProps<LogLineProps>()
 
 .timestamp {
   min-width: 140px;
+}
+
+.message {
+  min-width: 0;
 }
 </style>

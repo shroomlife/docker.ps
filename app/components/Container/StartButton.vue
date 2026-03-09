@@ -1,6 +1,9 @@
 <script lang="ts" setup>
 const dockerStore = useDockerStore()
 const toast = useToast()
+const emit = defineEmits<{
+  success: []
+}>()
 
 const { id } = defineProps({
   id: {
@@ -24,6 +27,7 @@ const startContainer = async () => {
       } as DockerContainerStartRequest,
     })
     dockerStore.updateContainer(startedContainer)
+    emit('success')
   }
   catch (error) {
     console.error('Failed to start container:', error)

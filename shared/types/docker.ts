@@ -14,6 +14,7 @@ export interface DockerStorePort {
   ip: string
   privatePort: number
   publicPort?: number
+  protocol?: string
 }
 
 export interface DockerStoreContainer {
@@ -24,6 +25,68 @@ export interface DockerStoreContainer {
   state: string
   status: string
   created: number
+}
+
+export interface DockerContainerMetadataEntry {
+  key: string
+  value: string
+}
+
+export interface DockerContainerMount {
+  type: string
+  source: string
+  destination: string
+  mode?: string
+  rw: boolean
+  propagation?: string
+  name?: string
+  driver?: string
+}
+
+export interface DockerContainerNetwork {
+  name: string
+  networkId?: string
+  endpointId?: string
+  gateway?: string
+  ipAddress?: string
+  macAddress?: string
+  aliases: string[]
+}
+
+export interface DockerContainerComposeMetadata {
+  project?: string
+  service?: string
+  containerNumber?: string
+}
+
+export interface DockerContainerDetails {
+  id: string
+  name: string
+  image: string
+  imageId: string
+  state: string
+  status: string
+  health: string | null
+  createdAt: string | null
+  startedAt: string | null
+  finishedAt: string | null
+  restartCount: number
+  exitCode: number | null
+  error: string | null
+  command: string
+  entrypoint: string[]
+  workingDir: string | null
+  restartPolicy: string | null
+  restartPolicyMaximumRetryCount: number | null
+  privileged: boolean
+  tty: boolean
+  networkMode: string | null
+  ports: DockerStorePort[]
+  networks: DockerContainerNetwork[]
+  mounts: DockerContainerMount[]
+  environment: DockerContainerMetadataEntry[]
+  labels: DockerContainerMetadataEntry[]
+  compose: DockerContainerComposeMetadata
 }
 
 export interface DockerContainerRestartRequest {
@@ -96,11 +159,17 @@ export interface DockerContainerLogsStreamRequest {
   tail?: number
 }
 
-export interface DockerLogLine {
+export interface DockerContainerLogEntry {
   id: string
-  timestamp: string
+  timestamp: string | null
+  timestampLabel: string
   message: string
   raw: string
+  fingerprint: string
+}
+
+export interface DockerContainerLogsResponse {
+  logs: DockerContainerLogEntry[]
 }
 
 export interface DockerStoreImage {

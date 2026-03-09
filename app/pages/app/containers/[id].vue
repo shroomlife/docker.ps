@@ -1,39 +1,120 @@
 <script lang="ts" setup>
-import type { ContainerInspectInfo } from 'dockerode'
+import type { BadgeProps } from '@nuxt/ui'
 import moment from 'moment'
+
+import type { DockerContainerDetails, DockerStorePort } from '~~/shared/types/docker'
 
 definePageMeta({
   layout: 'app',
 })
 
-const isLoading = ref<boolean>(true)
-const isLogsLoading = ref<boolean>(false)
-const isDownloading = ref<boolean>(false)
 const toast = useToast()
 const dockerStore = useDockerStore()
-
 const currentRoute = useRoute()
-if (!currentRoute.params.id) {
-  toast.add({
-    title: 'Error',
-    description: 'No Container provided',
-    color: 'error',
-  })
-  navigateTo('/app/containers')
+
+const container = ref<DockerContainerDetails | null>(null)
+const isLoading = ref(true)
+const isRefreshingDetails = ref(false)
+const scrollerRef = ref<{ scrollToBottom: () => void } | null>(null)
+
+const containerId = computed(() => String(currentRoute.params.id ?? ''))
+const {
+  autoScroll,
+  clearLogs,
+  connectionStatus,
+  connectionStatusConfig,
+  downloadLogs,
+  isDownloading,
+  isLiveMode,
+  isLogsLoading,
+  loadInitialLogs,
+  logs,
+  maxLogLines,
+  refreshLogs,
+  resetLogs,
+  searchValue,
+  toggleLiveMode,
+  visibleLogs,
+  wrapLines,
+} = useContainerLogs({
+  hostUuid: computed(() => dockerStore.getCurrentHost?.uuid),
+  containerId,
+  maxLogLines: 2000,
+})
+
+const getStateBadgeColor = (state: string): BadgeProps['color'] => {
+  switch (state) {
+    case 'running':
+      return 'success'
+    case 'paused':
+      return 'warning'
+    case 'exited':
+      return 'error'
+    case 'created':
+    case 'restarting':
+    case 'removing':
+      return 'info'
+    default:
+      return 'neutral'
+  }
 }
 
-const container = ref<ContainerInspectInfo | null>(null)
-const containerId = computed(() => currentRoute.params.id as string)
-const lastLogTimestamp = ref<number>(0)
+const getHealthBadgeColor = (health: string | null): BadgeProps['color'] => {
+  switch (health) {
+    case 'healthy':
+      return 'success'
+    case 'unhealthy':
+      return 'error'
+    case 'starting':
+      return 'warning'
+    default:
+      return 'neutral'
+  }
+}
+
+const formatAbsoluteDate = (value: string | null) => {
+  if (!value) {
+    return 'N/A'
+  }
+
+  return new Date(value).toLocaleString()
+}
+
+const formatRelativeDate = (value: string | null) => {
+  if (!value) {
+    return 'N/A'
+  }
+
+  return moment(value).fromNow()
+}
+
+const formatBoolean = (value: boolean) => value ? 'Enabled' : 'Disabled'
+
+const formatPortBinding = (port: DockerStorePort) => {
+  const protocol = port.protocol || 'tcp'
+  if (port.publicPort) {
+    return `${port.ip || '0.0.0.0'}:${port.publicPort} -> ${port.privatePort}/${protocol}`
+  }
+
+  return `${port.privatePort}/${protocol}`
+}
 
 const computedTitle = computed(() => {
-  return container.value?.Name.slice(1) || 'Loading...'
+  return container.value?.name || 'Container Details'
+})
+
+const computedDescription = computed(() => {
+  if (container.value?.compose.service && container.value.compose.project) {
+    return `${container.value.compose.service} in ${container.value.compose.project}`
+  }
+
+  return container.value?.image || 'Inspect runtime, networking, storage and logs'
 })
 
 const breadcrumbItems = computed(() => {
   return [
     {
-      label: dockerStore.getCurrentHost?.name || '',
+      label: dockerStore.getCurrentHost?.name || 'Containers',
       icon: 'tabler:stack',
       to: '/app/containers',
     },
@@ -44,656 +125,834 @@ const breadcrumbItems = computed(() => {
   ]
 })
 
-// Log line interface for Virtual Scroller
-interface ParsedLogLine {
-  id: string
-  timestamp: string
-  message: string
-  raw: string
-}
-
-// Logs state
-const logs = ref<ParsedLogLine[]>([])
-const maxLogLines = 2000
-const autoScroll = ref<boolean>(true)
-
-// SSE Live Streaming State
-const isLiveMode = ref<boolean>(false)
-const connectionStatus = ref<'disconnected' | 'connecting' | 'connected' | 'reconnecting'>('disconnected')
-const eventSource = ref<EventSource | null>(null)
-const reconnectAttempts = ref<number>(0)
-const maxReconnectAttempts = 10
-const reconnectTimeoutId = ref<ReturnType<typeof setTimeout> | null>(null)
-
-// Log batching for smooth UI updates (requestAnimationFrame based)
-const pendingLogs = ref<ParsedLogLine[]>([])
-let rafId: number | null = null
-
-// Virtual Scroller ref
-const scrollerRef = ref<{ scrollToBottom: () => void } | null>(null)
-
-// Generate unique ID for log lines
-let logIdCounter = 0
-const generateLogId = (): string => {
-  return `log-${Date.now()}-${logIdCounter++}`
-}
-
-const cleanLogLine = (line: string): ParsedLogLine | null => {
-  if (!line || typeof line !== 'string') return null
-
-  // 1. Remove Docker Stream Header (8 Bytes)
-  let cleaned = line
-  // eslint-disable-next-line no-control-regex
-  cleaned = cleaned.replace(/^[\x01\x02][\x00]{3}[\x00-\xFF]{4}/, '')
-  // eslint-disable-next-line no-control-regex
-  cleaned = cleaned.replace(/^[\u0000-\u0008\u0001\u0002]+/, '')
-
-  // 2. Extract Timestamp and Message
-  const match = cleaned.match(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.\d+Z\s+(.*)/)
-
-  if (!match) {
-    // eslint-disable-next-line no-control-regex
-    const directMessage = cleaned.replace(/\u001b\[[0-9;]*[A-Za-z]/g, '').trim()
-    if (!directMessage) return null
-    return {
-      id: generateLogId(),
-      timestamp: '',
-      message: directMessage,
-      raw: line,
-    }
+const overviewCards = computed(() => {
+  if (!container.value) {
+    return []
   }
 
-  const [, timestamp, message = ''] = match
-  const formattedTimestamp = moment(timestamp).format('YYYY-MM-DD HH:mm:ss')
-
-  // 3. Remove ANSI Escape Sequences
-  // eslint-disable-next-line no-control-regex
-  const cleanMessage = message.replace(/\u001b\[[0-9;]*[A-Za-z]/g, '').trim()
-
-  if (!cleanMessage) return null
-
-  return {
-    id: generateLogId(),
-    timestamp: formattedTimestamp,
-    message: cleanMessage,
-    raw: line,
-  }
-}
-
-const extractTimestamp = (line: string): number | null => {
-  if (!line || typeof line !== 'string') return null
-
-  let cleaned = line
-  // eslint-disable-next-line no-control-regex
-  cleaned = cleaned.replace(/^[\x01\x02][\x00]{3}[\x00-\xFF]{4}/, '')
-  // eslint-disable-next-line no-control-regex
-  cleaned = cleaned.replace(/^[\u0000-\u0008\u0001\u0002]+/, '')
-
-  const match = cleaned.match(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.\d+Z/)
-  if (match && match[1]) {
-    return moment(match[1]).unix()
-  }
-  return null
-}
-
-// Batched log update using requestAnimationFrame for smooth UI
-const flushPendingLogs = () => {
-  if (pendingLogs.value.length === 0) {
-    rafId = null
-    return
-  }
-
-  const logsToAdd = [...pendingLogs.value]
-  pendingLogs.value = []
-
-  // Deduplication based on raw content
-  const existingRaws = new Set(logs.value.slice(-200).map(l => l.raw))
-  const newLogs = logsToAdd.filter(l => !existingRaws.has(l.raw))
-
-  if (newLogs.length > 0) {
-    logs.value.push(...newLogs)
-
-    // Keep only the last maxLogLines
-    if (logs.value.length > maxLogLines) {
-      logs.value = logs.value.slice(-maxLogLines)
-    }
-
-    // Auto-scroll to bottom
-    if (autoScroll.value) {
-      nextTick(() => {
-        scrollerRef.value?.scrollToBottom()
-      })
-    }
-  }
-
-  rafId = null
-}
-
-const scheduleLogFlush = () => {
-  if (rafId === null) {
-    rafId = requestAnimationFrame(flushPendingLogs)
-  }
-}
-
-const addLogLine = (logLine: ParsedLogLine) => {
-  pendingLogs.value.push(logLine)
-  scheduleLogFlush()
-}
-
-const addLogLines = (newLogs: string[]) => {
-  if (newLogs.length === 0) return
-
-  let maxTs = lastLogTimestamp.value
-
-  for (const line of newLogs) {
-    const ts = extractTimestamp(line)
-    if (ts && ts > maxTs) {
-      maxTs = ts
-    }
-    const parsed = cleanLogLine(line)
-    if (parsed) {
-      pendingLogs.value.push(parsed)
-    }
-  }
-
-  lastLogTimestamp.value = maxTs
-  scheduleLogFlush()
-}
-
-// Exponential Backoff for reconnection
-const getReconnectDelay = (): number => {
-  const baseDelay = 1000
-  const maxDelay = 30000
-  const delay = Math.min(baseDelay * Math.pow(2, reconnectAttempts.value), maxDelay)
-  return delay
-}
-
-// SSE Connection Management
-const connectSSE = () => {
-  if (!dockerStore.currentHost || eventSource.value) return
-
-  connectionStatus.value = reconnectAttempts.value > 0 ? 'reconnecting' : 'connecting'
-
-  const url = new URL('/api/containers/logs/stream', window.location.origin)
-  url.searchParams.set('hostUuid', dockerStore.currentHost.uuid)
-  url.searchParams.set('containerId', containerId.value)
-  url.searchParams.set('tail', '100')
-
-  const es = new EventSource(url.toString())
-  eventSource.value = es
-
-  es.addEventListener('connected', () => {
-    connectionStatus.value = 'connected'
-    reconnectAttempts.value = 0
-    toast.add({
-      title: 'Connected',
-      description: 'Live log stream connected',
-      color: 'success',
-    })
-  })
-
-  es.addEventListener('log', (event) => {
-    try {
-      const data = JSON.parse(event.data)
-      if (data.log) {
-        const parsed = cleanLogLine(data.log)
-        if (parsed) {
-          addLogLine(parsed)
-        }
-      }
-    }
-    catch {
-      // Ignore parse errors
-    }
-  })
-
-  es.addEventListener('close', () => {
-    disconnectSSE()
-  })
-
-  es.addEventListener('error', () => {
-    disconnectSSE()
-    if (isLiveMode.value && reconnectAttempts.value < maxReconnectAttempts) {
-      const delay = getReconnectDelay()
-      reconnectAttempts.value++
-      connectionStatus.value = 'reconnecting'
-      reconnectTimeoutId.value = setTimeout(() => {
-        if (isLiveMode.value) {
-          connectSSE()
-        }
-      }, delay)
-    }
-    else if (reconnectAttempts.value >= maxReconnectAttempts) {
-      isLiveMode.value = false
-      toast.add({
-        title: 'Disconnected',
-        description: 'Max reconnection attempts reached. Click Live to retry.',
-        color: 'warning',
-      })
-    }
-  })
-
-  es.onerror = () => {
-    if (es.readyState === EventSource.CLOSED) {
-      disconnectSSE()
-    }
-  }
-}
-
-const disconnectSSE = () => {
-  if (eventSource.value) {
-    eventSource.value.close()
-    eventSource.value = null
-  }
-  if (reconnectTimeoutId.value) {
-    clearTimeout(reconnectTimeoutId.value)
-    reconnectTimeoutId.value = null
-  }
-  connectionStatus.value = 'disconnected'
-}
-
-const toggleLiveMode = () => {
-  isLiveMode.value = !isLiveMode.value
-  if (isLiveMode.value) {
-    reconnectAttempts.value = 0
-    connectSSE()
-  }
-  else {
-    disconnectSSE()
-  }
-}
-
-// Connection status UI helpers
-const connectionStatusConfig = computed(() => {
-  switch (connectionStatus.value) {
-    case 'connected':
-      return { color: 'success' as const, icon: 'i-tabler-circle-filled', text: 'Live', pulse: true }
-    case 'connecting':
-      return { color: 'warning' as const, icon: 'i-tabler-loader-2', text: 'Connecting...', pulse: false }
-    case 'reconnecting':
-      return { color: 'warning' as const, icon: 'i-tabler-loader-2', text: `Reconnecting (${reconnectAttempts.value}/${maxReconnectAttempts})...`, pulse: false }
-    default:
-      return { color: 'neutral' as const, icon: 'i-tabler-circle', text: 'Disconnected', pulse: false }
-  }
+  return [
+    {
+      label: 'State',
+      value: container.value.state,
+      detail: container.value.health ? `Health: ${container.value.health}` : container.value.status,
+    },
+    {
+      label: 'Created',
+      value: formatRelativeDate(container.value.createdAt),
+      detail: formatAbsoluteDate(container.value.createdAt),
+    },
+    {
+      label: 'Started',
+      value: formatRelativeDate(container.value.startedAt),
+      detail: formatAbsoluteDate(container.value.startedAt),
+    },
+    {
+      label: 'Restarts',
+      value: String(container.value.restartCount),
+      detail: container.value.restartPolicy || 'No restart policy',
+    },
+  ]
 })
 
-const fetchLogs = async (sinceTimestamp: number = 0) => {
-  if (isLogsLoading.value || !dockerStore.currentHost) return
+const runtimeFacts = computed(() => {
+  if (!container.value) {
+    return []
+  }
 
+  return [
+    { label: 'Command', value: container.value.command || 'N/A', copyable: !!container.value.command },
+    {
+      label: 'Entrypoint',
+      value: container.value.entrypoint.length > 0 ? container.value.entrypoint.join(' ') : 'N/A',
+      copyable: container.value.entrypoint.length > 0,
+    },
+    { label: 'Working directory', value: container.value.workingDir || 'N/A', copyable: !!container.value.workingDir },
+    { label: 'Restart policy', value: container.value.restartPolicy || 'none', copyable: false },
+    {
+      label: 'Retry limit',
+      value: container.value.restartPolicyMaximumRetryCount !== null
+        ? String(container.value.restartPolicyMaximumRetryCount)
+        : 'N/A',
+      copyable: false,
+    },
+    { label: 'TTY', value: formatBoolean(container.value.tty), copyable: false },
+    { label: 'Privileged', value: formatBoolean(container.value.privileged), copyable: false },
+  ]
+})
+
+const lifecycleFacts = computed(() => {
+  if (!container.value) {
+    return []
+  }
+
+  return [
+    { label: 'Container ID', value: container.value.id, copyable: true },
+    { label: 'Image', value: container.value.image, copyable: true },
+    { label: 'Image ID', value: container.value.imageId, copyable: true },
+    { label: 'Exit code', value: container.value.exitCode !== null ? String(container.value.exitCode) : 'N/A', copyable: false },
+    { label: 'Last finished', value: formatAbsoluteDate(container.value.finishedAt), copyable: false },
+    { label: 'Network mode', value: container.value.networkMode || 'default', copyable: false },
+    { label: 'State error', value: container.value.error || 'None', copyable: !!container.value.error },
+  ]
+})
+
+const copyText = async (label: string, value: string) => {
   try {
-    isLogsLoading.value = true
-
-    const response = await $fetch<{ logs: string[] }>('/api/containers/logs', {
-      method: 'POST',
-      body: {
-        hostUuid: dockerStore.currentHost.uuid,
-        containerId: containerId.value,
-        follow: false,
-        tail: maxLogLines,
-        since: sinceTimestamp,
-      } as DockerContainerLogsRequest,
+    await navigator.clipboard.writeText(value)
+    toast.add({
+      title: 'Copied',
+      description: `${label} copied to clipboard`,
+      color: 'success',
     })
-
-    // If we fetched with since=0 (initial load), we replace logs
-    if (sinceTimestamp === 0) {
-      logs.value = []
-      lastLogTimestamp.value = 0
-    }
-
-    addLogLines(response.logs)
   }
   catch (error) {
-    console.error('Failed to fetch logs:', error)
+    console.error(`Failed to copy ${label}:`, error)
     toast.add({
       title: 'Error',
-      description: 'Failed to fetch logs',
+      description: `Failed to copy ${label}`,
       color: 'error',
     })
   }
-  finally {
-    isLogsLoading.value = false
-  }
 }
 
-const refreshLogs = () => {
-  fetchLogs(lastLogTimestamp.value)
-}
-
-// Cleanup on unmount
-onUnmounted(() => {
-  disconnectSSE()
-  if (rafId !== null) {
-    cancelAnimationFrame(rafId)
+const loadContainerDetails = async (isBackgroundRefresh = false) => {
+  if (!dockerStore.getCurrentHost?.uuid) {
+    toast.add({
+      title: 'Error',
+      description: 'Select a Docker host before opening container details.',
+      color: 'error',
+    })
+    await navigateTo('/app')
+    return
   }
-})
 
-onMounted(async () => {
+  if (!containerId.value) {
+    toast.add({
+      title: 'Error',
+      description: 'No container ID was provided.',
+      color: 'error',
+    })
+    await navigateTo('/app/containers')
+    return
+  }
+
   try {
-    isLoading.value = true
-    container.value = await $fetch<ContainerInspectInfo>(`/api/containers`, {
+    if (isBackgroundRefresh) {
+      isRefreshingDetails.value = true
+    }
+    else {
+      isLoading.value = true
+    }
+
+    container.value = await $fetch<DockerContainerDetails>('/api/containers', {
       method: 'POST',
       body: {
-        hostUuid: dockerStore.currentHost?.uuid,
+        hostUuid: dockerStore.getCurrentHost.uuid,
         containerId: containerId.value,
       } as DockerContainerGetRequest,
     })
-
-    if (dockerStore.currentHost) {
-      await fetchLogs()
-    }
   }
   catch (error) {
-    console.error('Failed to fetch Container Details', error)
+    console.error('Failed to fetch container details:', error)
     toast.add({
       title: 'Error',
-      description: 'Failed to fetch Container Details',
+      description: 'Failed to fetch container details',
       color: 'error',
     })
-    navigateTo('/app/containers')
+    await navigateTo('/app/containers')
   }
   finally {
+    isRefreshingDetails.value = false
     isLoading.value = false
   }
+}
+
+const initializePage = async () => {
+  resetLogs()
+  await loadContainerDetails()
+  if (container.value) {
+    await loadInitialLogs()
+  }
+}
+
+const handleContainerMutation = async () => {
+  await Promise.all([
+    loadContainerDetails(true),
+    dockerStore.loadContainers(),
+    refreshLogs(),
+  ])
+}
+
+const handleContainerRemoval = async () => {
+  toast.add({
+    title: 'Container removed',
+    description: 'The container was removed successfully.',
+    color: 'success',
+  })
+  await navigateTo('/app/containers')
+}
+
+watch(() => visibleLogs.value.length, async (newLength, previousLength) => {
+  if (!autoScroll.value || newLength <= previousLength) {
+    return
+  }
+
+  await nextTick()
+  scrollerRef.value?.scrollToBottom()
 })
 
-// Download logs function
-const downloadLogs = async () => {
-  if (!dockerStore.currentHost) {
-    toast.add({
-      title: 'Error',
-      description: 'No Docker host selected',
-      color: 'error',
-    })
-    return
-  }
-
-  if (isDownloading.value) {
-    return
-  }
-
-  try {
-    isDownloading.value = true
-
-    const response = await $fetch<string>('/api/containers/logs/download', {
-      method: 'POST',
-      body: {
-        hostUuid: dockerStore.currentHost.uuid,
-        containerId: containerId.value,
-      } as DockerContainerLogsRequest,
-      timeout: 300000,
-    })
-
-    if (!response || response.length === 0) {
-      toast.add({
-        title: 'Info',
-        description: 'No logs available for download',
-        color: 'info',
-      })
+watch(
+  [
+    () => containerId.value,
+    () => dockerStore.getCurrentHost?.uuid || '',
+  ],
+  async ([nextContainerId, nextHostUuid], [previousContainerId, previousHostUuid]) => {
+    if (!nextContainerId || !nextHostUuid) {
       return
     }
 
-    const timestamp = moment().format('YYYY-MM-DDTHH-mm-ss')
-    const filename = `logs-${timestamp}.log`
-
-    const blob = new Blob([response], { type: 'text/plain' })
-    const url = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = filename
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    window.URL.revokeObjectURL(url)
-
-    toast.add({
-      title: 'Success',
-      description: 'Logs downloaded successfully',
-      color: 'success',
-    })
-  }
-  catch (error: unknown) {
-    console.error('Failed to download logs:', error)
-
-    let errorMessage = 'Failed to download logs'
-    if (error && typeof error === 'object') {
-      if ('statusMessage' in error && typeof error.statusMessage === 'string') {
-        errorMessage = error.statusMessage
-      }
-      else if ('message' in error && typeof error.message === 'string') {
-        errorMessage = error.message
-      }
-    }
-    else if (typeof error === 'string') {
-      errorMessage = error
+    if (nextContainerId === previousContainerId && nextHostUuid === previousHostUuid) {
+      return
     }
 
-    toast.add({
-      title: 'Error',
-      description: errorMessage,
-      color: 'error',
-    })
-  }
-  finally {
-    isDownloading.value = false
-  }
-}
+    await initializePage()
+  },
+)
+
+onMounted(async () => {
+  await initializePage()
+})
 </script>
 
 <template>
   <AppDashboardPage
     :title="computedTitle"
     :headline="dockerStore.getCurrentHost?.name"
+    :description="computedDescription"
   >
     <template #header>
       <UDashboardNavbar>
         <template #left>
           <UBreadcrumb :items="breadcrumbItems" />
         </template>
-      </UDashboardNavbar>
-    </template>
 
-    <!-- Container Info Card -->
-    <UCard v-if="container">
-      <template #header>
-        <div class="flex items-center justify-between">
-          <h3 class="text-lg font-semibold">
-            Container Information
-          </h3>
-        </div>
-      </template>
-      <div class="flex flex-col gap-3">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <p class="text-sm text-gray-500 mb-1">
-              Image
-            </p>
-            <p class="font-mono text-sm">
-              {{ container.Config?.Image }}
-            </p>
-          </div>
-          <div>
-            <p class="text-sm text-gray-500 mb-1">
-              Created
-            </p>
-            <p class="text-sm">
-              {{ new Date(container.Created).toLocaleString() }}
-            </p>
-          </div>
-          <div>
-            <p class="text-sm text-gray-500 mb-1">
-              Container ID
-            </p>
-            <p class="font-mono text-xs">
-              {{ container.Id.substring(0, 12) }}
-            </p>
-          </div>
-          <div>
-            <p class="text-sm text-gray-500 mb-1">
-              Status
-            </p>
-            <p class="text-sm">
-              {{ container.State?.Status }}
-            </p>
-          </div>
-        </div>
-      </div>
-    </UCard>
-
-    <!-- Logs Card -->
-    <UCard>
-      <template #header>
-        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div class="flex items-center gap-3">
-            <h3 class="text-lg font-semibold">
-              Container Logs
-            </h3>
-            <!-- Connection Status Badge -->
+        <template #right>
+          <div
+            v-if="container"
+            class="flex flex-wrap items-center justify-end gap-2"
+          >
             <UBadge
-              :color="connectionStatusConfig.color"
-              variant="subtle"
-              size="sm"
-              class="transition-all"
-              :class="{ 'animate-pulse-live': connectionStatusConfig.pulse }"
-            >
-              <UIcon
-                :name="connectionStatusConfig.icon"
-                class="w-3 h-3 mr-1"
-                :class="{ 'animate-spin': connectionStatus === 'connecting' || connectionStatus === 'reconnecting' }"
-              />
-              {{ connectionStatusConfig.text }}
-            </UBadge>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <!-- Live Mode Toggle -->
-            <UButton
-              :icon="isLiveMode ? 'i-tabler-player-pause' : 'i-tabler-broadcast'"
-              :color="isLiveMode ? 'warning' : 'success'"
+              :color="getStateBadgeColor(container.state)"
               variant="soft"
-              size="sm"
-              @click="toggleLiveMode"
+              size="lg"
             >
-              {{ isLiveMode ? 'Pause' : 'Live' }}
-            </UButton>
-            <!-- Refresh Button (only when not live) -->
+              {{ container.state }}
+            </UBadge>
+
+            <UBadge
+              v-if="container.health"
+              :color="getHealthBadgeColor(container.health)"
+              variant="outline"
+              size="lg"
+            >
+              Health: {{ container.health }}
+            </UBadge>
+
             <UButton
-              v-if="!isLiveMode"
               icon="i-tabler-refresh"
               color="neutral"
-              variant="outline"
-              size="sm"
-              :loading="isLogsLoading"
-              @click="refreshLogs"
+              variant="ghost"
+              :loading="isRefreshingDetails"
+              @click="handleContainerMutation"
             >
               Refresh
             </UButton>
-            <!-- Download Button -->
-            <UButton
-              icon="i-tabler-download"
-              color="neutral"
-              variant="outline"
-              size="sm"
-              :loading="isDownloading"
-              :disabled="isDownloading"
-              @click="downloadLogs"
-            >
-              Download
-            </UButton>
+
+            <ContainerUnpauseButton
+              v-if="container.state === 'paused'"
+              :id="container.id"
+              @success="handleContainerMutation"
+            />
+            <ContainerStartButton
+              v-if="container.state === 'exited'"
+              :id="container.id"
+              @success="handleContainerMutation"
+            />
+            <ContainerPauseButton
+              v-if="container.state === 'running'"
+              :id="container.id"
+              @success="handleContainerMutation"
+            />
+            <ContainerRestartButton
+              v-if="container.state !== 'exited'"
+              :id="container.id"
+              @success="handleContainerMutation"
+            />
+            <ContainerStopButton
+              v-if="container.state !== 'exited'"
+              :id="container.id"
+              @success="handleContainerMutation"
+            />
+            <ContainerRemoveButton
+              v-if="container.state === 'exited'"
+              :id="container.id"
+              @success="handleContainerRemoval"
+            />
           </div>
-        </div>
-      </template>
+        </template>
+      </UDashboardNavbar>
+    </template>
 
-      <!-- Logs Container with Virtual Scroller -->
-      <div class="logs-wrapper bg-gray-900 dark:bg-gray-50 rounded-lg overflow-hidden">
-        <!-- Empty State -->
-        <div
-          v-if="logs.length === 0 && !isLogsLoading"
-          class="flex flex-col items-center justify-center py-16 text-gray-400"
-        >
-          <UIcon
-            name="i-tabler-file-text"
-            class="w-12 h-12 mb-3 opacity-50"
-          />
-          <p class="text-sm">
-            No logs available
-          </p>
-          <p class="text-xs mt-1 opacity-75">
-            Start the container or click Live to stream logs
-          </p>
-        </div>
-
-        <!-- Loading State -->
-        <div
-          v-else-if="isLogsLoading && logs.length === 0"
-          class="flex flex-col items-center justify-center py-16 text-gray-400"
-        >
-          <UIcon
-            name="i-tabler-loader-2"
-            class="w-8 h-8 mb-3 animate-spin"
-          />
-          <p class="text-sm">
-            Loading logs...
-          </p>
-        </div>
-
-        <!-- Virtual Scroller for Logs -->
-        <DynamicScroller
-          v-else
-          ref="scrollerRef"
-          :items="logs"
-          :min-item-size="24"
-          key-field="id"
-          class="log-scroller"
-          style="height: 500px;"
-        >
-          <template #default="{ item, index, active }">
-            <DynamicScrollerItem
-              :item="item"
-              :active="active"
-              :data-index="index"
-            >
-              <ContainerLogLine
-                :timestamp="item.timestamp"
-                :message="item.message"
-                :index="index"
-              />
-            </DynamicScrollerItem>
-          </template>
-        </DynamicScroller>
+    <div class="space-y-6">
+      <div
+        v-if="isLoading && !container"
+        class="rounded-xl border border-default bg-default/40 px-6 py-10 text-sm text-dimmed"
+      >
+        Loading container details...
       </div>
 
-      <template #footer>
-        <div class="flex items-center justify-between text-xs text-gray-500">
-          <div class="flex items-center gap-4">
-            <span>{{ logs.length.toLocaleString() }} / {{ maxLogLines.toLocaleString() }} lines</span>
-            <label class="flex items-center gap-1.5 cursor-pointer select-none">
-              <input
-                v-model="autoScroll"
-                type="checkbox"
-                class="w-3.5 h-3.5 rounded border-gray-400 text-primary-500 focus:ring-primary-500 focus:ring-offset-0"
-              >
-              <span>Auto-scroll</span>
-            </label>
-          </div>
+      <template v-else-if="container">
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div
-            v-if="isLiveMode && connectionStatus === 'connected'"
-            class="flex items-center gap-1.5 text-green-500"
+            v-for="card in overviewCards"
+            :key="card.label"
+            class="rounded-xl border border-default bg-default/60 px-4 py-4"
           >
-            <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <span>Streaming</span>
+            <div class="text-xs font-medium uppercase tracking-wide text-dimmed">
+              {{ card.label }}
+            </div>
+            <div class="mt-2 text-lg font-semibold text-highlighted">
+              {{ card.value }}
+            </div>
+            <div class="mt-1 text-sm text-dimmed">
+              {{ card.detail }}
+            </div>
           </div>
         </div>
+
+        <div class="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+          <UCard>
+            <template #header>
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <h3 class="text-lg font-semibold">
+                    Runtime
+                  </h3>
+                  <p class="text-sm text-dimmed">
+                    Command, image and lifecycle information for this container.
+                  </p>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                  <UBadge
+                    v-if="container.compose.project"
+                    color="neutral"
+                    variant="soft"
+                  >
+                    {{ container.compose.project }}
+                  </UBadge>
+                  <UBadge
+                    v-if="container.compose.service"
+                    color="info"
+                    variant="soft"
+                  >
+                    {{ container.compose.service }}
+                  </UBadge>
+                </div>
+              </div>
+            </template>
+
+            <div class="space-y-6">
+              <div class="rounded-xl border border-default bg-default/40 p-4">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="text-xs font-medium uppercase tracking-wide text-dimmed">
+                      Image
+                    </div>
+                    <div class="mt-2 break-all font-mono text-sm text-highlighted">
+                      {{ container.image }}
+                    </div>
+                  </div>
+
+                  <UButton
+                    icon="i-tabler-copy"
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    @click="copyText('Image', container.image)"
+                  />
+                </div>
+              </div>
+
+              <div class="grid gap-4 md:grid-cols-2">
+                <div
+                  v-for="fact in runtimeFacts"
+                  :key="fact.label"
+                  class="rounded-xl border border-default bg-default/40 p-4"
+                >
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <div class="text-xs font-medium uppercase tracking-wide text-dimmed">
+                        {{ fact.label }}
+                      </div>
+                      <div class="mt-2 break-all font-mono text-sm text-highlighted">
+                        {{ fact.value }}
+                      </div>
+                    </div>
+
+                    <UButton
+                      v-if="fact.copyable"
+                      icon="i-tabler-copy"
+                      size="xs"
+                      color="neutral"
+                      variant="ghost"
+                      @click="copyText(fact.label, fact.value)"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </UCard>
+
+          <UCard>
+            <template #header>
+              <div>
+                <h3 class="text-lg font-semibold">
+                  Lifecycle
+                </h3>
+                <p class="text-sm text-dimmed">
+                  Identity, status and shutdown information.
+                </p>
+              </div>
+            </template>
+
+            <div class="space-y-4">
+              <div
+                v-for="fact in lifecycleFacts"
+                :key="fact.label"
+                class="rounded-xl border border-default bg-default/40 p-4"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="text-xs font-medium uppercase tracking-wide text-dimmed">
+                      {{ fact.label }}
+                    </div>
+                    <div class="mt-2 break-all font-mono text-sm text-highlighted">
+                      {{ fact.value }}
+                    </div>
+                  </div>
+
+                  <UButton
+                    v-if="fact.copyable"
+                    icon="i-tabler-copy"
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    @click="copyText(fact.label, fact.value)"
+                  />
+                </div>
+              </div>
+            </div>
+          </UCard>
+        </div>
+
+        <div class="grid gap-6 xl:grid-cols-2">
+          <UCard>
+            <template #header>
+              <div>
+                <h3 class="text-lg font-semibold">
+                  Networking
+                </h3>
+                <p class="text-sm text-dimmed">
+                  Published ports, bindings and connected Docker networks.
+                </p>
+              </div>
+            </template>
+
+            <div class="space-y-6">
+              <div>
+                <div class="mb-3 text-xs font-medium uppercase tracking-wide text-dimmed">
+                  Port bindings
+                </div>
+
+                <div
+                  v-if="container.ports.length > 0"
+                  class="flex flex-wrap gap-2"
+                >
+                  <UBadge
+                    v-for="port in container.ports"
+                    :key="`${port.privatePort}-${port.publicPort}-${port.protocol}-${port.ip}`"
+                    color="info"
+                    variant="soft"
+                    size="lg"
+                  >
+                    {{ formatPortBinding(port) }}
+                  </UBadge>
+                </div>
+
+                <div
+                  v-else
+                  class="rounded-lg border border-dashed border-default px-4 py-5 text-sm text-dimmed"
+                >
+                  No published ports configured.
+                </div>
+              </div>
+
+              <div>
+                <div class="mb-3 text-xs font-medium uppercase tracking-wide text-dimmed">
+                  Networks
+                </div>
+
+                <div
+                  v-if="container.networks.length > 0"
+                  class="space-y-3"
+                >
+                  <div
+                    v-for="network in container.networks"
+                    :key="network.name"
+                    class="rounded-xl border border-default bg-default/40 p-4"
+                  >
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="font-semibold text-highlighted">{{ network.name }}</span>
+                      <UBadge
+                        v-if="network.ipAddress"
+                        color="neutral"
+                        variant="soft"
+                      >
+                        {{ network.ipAddress }}
+                      </UBadge>
+                    </div>
+
+                    <div class="mt-3 grid gap-3 md:grid-cols-2">
+                      <div class="text-sm text-dimmed">
+                        Gateway: <span class="font-mono text-highlighted">{{ network.gateway || 'N/A' }}</span>
+                      </div>
+                      <div class="text-sm text-dimmed">
+                        MAC: <span class="font-mono text-highlighted">{{ network.macAddress || 'N/A' }}</span>
+                      </div>
+                    </div>
+
+                    <div
+                      v-if="network.aliases.length > 0"
+                      class="mt-3 flex flex-wrap gap-2"
+                    >
+                      <UBadge
+                        v-for="alias in network.aliases"
+                        :key="alias"
+                        color="neutral"
+                        variant="outline"
+                      >
+                        {{ alias }}
+                      </UBadge>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  v-else
+                  class="rounded-lg border border-dashed border-default px-4 py-5 text-sm text-dimmed"
+                >
+                  No Docker networks were reported for this container.
+                </div>
+              </div>
+            </div>
+          </UCard>
+
+          <UCard>
+            <template #header>
+              <div>
+                <h3 class="text-lg font-semibold">
+                  Storage
+                </h3>
+                <p class="text-sm text-dimmed">
+                  Mounted volumes and bind mounts available to the container.
+                </p>
+              </div>
+            </template>
+
+            <div
+              v-if="container.mounts.length > 0"
+              class="space-y-3"
+            >
+              <div
+                v-for="mount in container.mounts"
+                :key="`${mount.destination}-${mount.source}`"
+                class="rounded-xl border border-default bg-default/40 p-4"
+              >
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="font-semibold text-highlighted">{{ mount.destination }}</span>
+                  <UBadge
+                    color="neutral"
+                    variant="soft"
+                  >
+                    {{ mount.type }}
+                  </UBadge>
+                  <UBadge
+                    :color="mount.rw ? 'success' : 'neutral'"
+                    variant="outline"
+                  >
+                    {{ mount.rw ? 'rw' : 'ro' }}
+                  </UBadge>
+                </div>
+
+                <div class="mt-3 grid gap-3 md:grid-cols-2">
+                  <div class="text-sm text-dimmed">
+                    Source: <span class="break-all font-mono text-highlighted">{{ mount.source }}</span>
+                  </div>
+                  <div class="text-sm text-dimmed">
+                    Mode: <span class="font-mono text-highlighted">{{ mount.mode || 'default' }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div
+              v-else
+              class="rounded-lg border border-dashed border-default px-4 py-5 text-sm text-dimmed"
+            >
+              No mounts or volumes are attached to this container.
+            </div>
+          </UCard>
+        </div>
+
+        <UCard>
+          <template #header>
+            <div>
+              <h3 class="text-lg font-semibold">
+                Metadata
+              </h3>
+              <p class="text-sm text-dimmed">
+                Compose labels, environment variables and raw labels for troubleshooting.
+              </p>
+            </div>
+          </template>
+
+          <div class="grid gap-6 xl:grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)]">
+            <div class="space-y-4">
+              <div class="rounded-xl border border-default bg-default/40 p-4">
+                <div class="text-xs font-medium uppercase tracking-wide text-dimmed">
+                  Compose metadata
+                </div>
+
+                <div class="mt-3 space-y-3">
+                  <div class="text-sm text-dimmed">
+                    Project:
+                    <span class="font-mono text-highlighted">
+                      {{ container.compose.project || 'N/A' }}
+                    </span>
+                  </div>
+                  <div class="text-sm text-dimmed">
+                    Service:
+                    <span class="font-mono text-highlighted">
+                      {{ container.compose.service || 'N/A' }}
+                    </span>
+                  </div>
+                  <div class="text-sm text-dimmed">
+                    Container number:
+                    <span class="font-mono text-highlighted">
+                      {{ container.compose.containerNumber || 'N/A' }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="space-y-4">
+              <ContainerMetadataPanel
+                title="Environment variables"
+                :entries="container.environment"
+                empty-text="No environment variables were reported."
+              />
+              <ContainerMetadataPanel
+                title="Labels"
+                :entries="container.labels"
+                empty-text="No labels were reported."
+              />
+            </div>
+          </div>
+        </UCard>
+
+        <UCard>
+          <template #header>
+            <div class="flex flex-col gap-4">
+              <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div class="flex items-center gap-3">
+                  <h3 class="text-lg font-semibold">
+                    Container Logs
+                  </h3>
+                  <UBadge
+                    :color="connectionStatusConfig.color"
+                    variant="subtle"
+                    size="sm"
+                    class="transition-all"
+                    :class="{ 'animate-pulse-live': connectionStatusConfig.pulse }"
+                  >
+                    <UIcon
+                      :name="connectionStatusConfig.icon"
+                      class="mr-1 h-3 w-3"
+                      :class="{ 'animate-spin': connectionStatus === 'connecting' || connectionStatus === 'reconnecting' }"
+                    />
+                    {{ connectionStatusConfig.text }}
+                  </UBadge>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                  <UInput
+                    v-model="searchValue"
+                    icon="i-tabler-search"
+                    placeholder="Search current buffer"
+                    class="min-w-64"
+                  />
+                  <UButton
+                    :icon="wrapLines ? 'i-tabler-wrap' : 'i-tabler-text-wrap-off'"
+                    color="neutral"
+                    variant="outline"
+                    @click="wrapLines = !wrapLines"
+                  >
+                    {{ wrapLines ? 'Wrap On' : 'Wrap Off' }}
+                  </UButton>
+                  <UButton
+                    icon="i-tabler-eraser"
+                    color="neutral"
+                    variant="outline"
+                    @click="clearLogs"
+                  >
+                    Clear
+                  </UButton>
+                  <UButton
+                    :icon="isLiveMode ? 'i-tabler-player-pause' : 'i-tabler-broadcast'"
+                    :color="isLiveMode ? 'warning' : 'success'"
+                    variant="soft"
+                    @click="toggleLiveMode"
+                  >
+                    {{ isLiveMode ? 'Pause' : 'Live' }}
+                  </UButton>
+                  <UButton
+                    icon="i-tabler-refresh"
+                    color="neutral"
+                    variant="outline"
+                    :loading="isLogsLoading"
+                    @click="refreshLogs"
+                  >
+                    Refresh
+                  </UButton>
+                  <UButton
+                    icon="i-tabler-download"
+                    color="neutral"
+                    variant="outline"
+                    :loading="isDownloading"
+                    @click="downloadLogs"
+                  >
+                    Download
+                  </UButton>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <div class="logs-wrapper rounded-lg border border-default bg-gray-950 text-white">
+            <div
+              v-if="logs.length === 0 && !isLogsLoading"
+              class="flex flex-col items-center justify-center py-16 text-gray-400"
+            >
+              <UIcon
+                name="i-tabler-file-text"
+                class="mb-3 h-12 w-12 opacity-50"
+              />
+              <p class="text-sm">
+                No logs available
+              </p>
+              <p class="mt-1 text-xs opacity-75">
+                Start the container or use Live to stream new output.
+              </p>
+            </div>
+
+            <div
+              v-else-if="visibleLogs.length === 0 && searchValue.trim()"
+              class="flex flex-col items-center justify-center py-16 text-gray-400"
+            >
+              <UIcon
+                name="i-tabler-search-off"
+                class="mb-3 h-10 w-10 opacity-50"
+              />
+              <p class="text-sm">
+                No log lines match the current search.
+              </p>
+            </div>
+
+            <div
+              v-else-if="isLogsLoading && logs.length === 0"
+              class="flex flex-col items-center justify-center py-16 text-gray-400"
+            >
+              <UIcon
+                name="i-tabler-loader-2"
+                class="mb-3 h-8 w-8 animate-spin"
+              />
+              <p class="text-sm">
+                Loading logs...
+              </p>
+            </div>
+
+            <DynamicScroller
+              v-else
+              ref="scrollerRef"
+              :items="visibleLogs"
+              :min-item-size="24"
+              key-field="id"
+              class="log-scroller"
+              style="height: 500px;"
+            >
+              <template #default="{ item, index, active }">
+                <DynamicScrollerItem
+                  :item="item"
+                  :active="active"
+                  :data-index="index"
+                >
+                  <ContainerLogLine
+                    :timestamp="item.timestampLabel"
+                    :message="item.message"
+                    :index="index"
+                    :wrap-lines="wrapLines"
+                  />
+                </DynamicScrollerItem>
+              </template>
+            </DynamicScroller>
+          </div>
+
+          <template #footer>
+            <div class="flex flex-col gap-3 text-xs text-dimmed md:flex-row md:items-center md:justify-between">
+              <div class="flex flex-wrap items-center gap-4">
+                <span>
+                  {{ visibleLogs.length.toLocaleString() }} visible / {{ logs.length.toLocaleString() }} buffered / {{ maxLogLines.toLocaleString() }} max
+                </span>
+                <label class="flex cursor-pointer items-center gap-1.5 select-none">
+                  <input
+                    v-model="autoScroll"
+                    type="checkbox"
+                    class="h-3.5 w-3.5 rounded border-gray-400 text-primary-500 focus:ring-primary-500 focus:ring-offset-0"
+                  >
+                  <span>Auto-scroll</span>
+                </label>
+              </div>
+
+              <div
+                v-if="isLiveMode && connectionStatus === 'connected'"
+                class="flex items-center gap-1.5 text-green-500"
+              >
+                <span class="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                <span>Streaming</span>
+              </div>
+            </div>
+          </template>
+        </UCard>
       </template>
-    </UCard>
+    </div>
   </AppDashboardPage>
 </template>
 
 <style lang="scss" scoped>
 .logs-wrapper {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-
-  :root.dark & {
-    border-color: rgba(0, 0, 0, 0.1);
-  }
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .log-scroller {
