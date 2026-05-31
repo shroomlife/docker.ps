@@ -19,7 +19,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.3.3"
+          bun-version: "1.3.10"
 
       - name: Install Dependencies
         run: bun install
@@ -29,6 +29,9 @@ jobs:
 
       - name: Run Linter
         run: bun run lint
+
+      - name: Run Tests
+        run: bun run test
 
   # ====================
   # docker.ps (Main App)
@@ -65,7 +68,10 @@ jobs:
           host: ${{ vars.DEPLOY_HOST }}
           username: ${{ vars.DEPLOY_USERNAME }}
           key: ${{ secrets.DEPLOY_KEY }}
-          script: docker compose pull docker_ps && docker compose up -d docker_ps
+          script: |
+            cd /home/shroomlife
+            docker compose pull docker_ps
+            docker compose up -d docker_ps
 
   # ====================
   # docker.ps-agent
