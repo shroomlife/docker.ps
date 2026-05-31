@@ -2,7 +2,7 @@ services:
 
   postgres_docker_ps:
     container_name: postgres_docker_ps
-    image: postgres:latest
+    image: postgres:17
     restart: always
     environment:
       POSTGRES_DB: dockerps
@@ -11,4 +11,4 @@ services:
     volumes:
       - "C:\\code\\usr\\shroomlife\\volumes\\docker.ps\\postgres:/var/lib/postgresql/data"
     ports:
-      - "5432:5432"
+      - "5499:5432"

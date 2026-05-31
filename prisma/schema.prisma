@@ -49,7 +49,9 @@ model DockerHost {
   name String @db.VarChar(255)
   url  String
 
-  authKey String @db.VarChar(255)
+  // Stored encrypted at rest (AES-256-GCM, see server/utils/crypto.ts). The
+  // versioned ciphertext blob exceeds 255 chars, so this must be `text`.
+  authKey String
 
   isActive Boolean @default(true)
 

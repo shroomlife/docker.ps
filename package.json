@@ -18,7 +18,8 @@
     "lint": "eslint . --ext .ts,.vue",
     "lint:fix": "eslint . --ext .ts,.vue --fix",
     "preview": "nuxt preview",
-    "test": "bun test",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
@@ -38,6 +39,7 @@
     "@iconify-json/lucide": "1.2.95",
     "@iconify-json/tabler": "1.2.29",
     "@nuxt/eslint": "1.15.2",
+    "@nuxt/test-utils": "4.0.3",
     "@nuxt/ui": "4.5.1",
     "@pinia/nuxt": "0.11.3",
     "@types/dockerode": "4.0.1",
@@ -45,11 +47,13 @@
     "@types/node": "25.3.5",
     "@types/pg": "8.18.0",
     "eslint": "10.0.2",
+    "happy-dom": "20.9.0",
     "nuxt": "4.3.1",
     "pinia": "3.0.4",
     "prisma": "7.4.2",
     "sass": "1.97.3",
     "typescript": "5.9.3",
+    "vitest": "4.1.7",
     "vue": "3.5.29",
     "vue-tsc": "3.2.5"
   },
