@@ -12,7 +12,9 @@ export const AuthSettings = {
     name: 'docker.ps/auth',
     options: {
       sameSite: 'lax' as CookieOptions['sameSite'],
-      httpOnly: false,
+      // httpOnly so the JWT session cookie is not readable by JS (XSS-safe).
+      // Client auth state is derived from /api/auth/me, not from reading the cookie.
+      httpOnly: true,
       path: '/',
       secure: process.env.NODE_ENV === 'production',
     },

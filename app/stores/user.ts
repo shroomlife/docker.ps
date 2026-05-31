@@ -6,25 +6,20 @@ export const useUserStore = defineStore('UserStore', {
     currentUser: null,
   }),
   actions: {
-    hasAuthCookie(): boolean {
-      const userCookie = useCookie(AuthSettings.cookie.name, AuthSettings.cookie.options)
-      return !!userCookie.value
-    },
     async initialize() {
       if (this.isInitialized) return
 
       const appStore = useAppStore()
       appStore.addLoader('userStore/initialize')
-      const userCookie = useCookie(AuthSettings.cookie.name, AuthSettings.cookie.options)
-      if (userCookie.value) {
-        try {
-          const loadedUser = await $fetch<AppUser>(`/api/auth/me`)
-          this.setCurrentUser(loadedUser)
-        }
-        catch (error) {
-          console.error('Error verifying User Cookie:', error)
-          this.currentUser = null
-        }
+      // The session cookie is httpOnly (not readable by JS), so we derive auth
+      // state from the server: /api/auth/me sends the cookie automatically and
+      // returns 401 when there is no valid session.
+      try {
+        const loadedUser = await $fetch<AppUser>(`/api/auth/me`)
+        this.setCurrentUser(loadedUser)
+      }
+      catch {
+        this.currentUser = null
       }
       this.isInitialized = true
       appStore.removeLoader('userStore/initialize')
@@ -47,10 +42,15 @@ export const useUserStore = defineStore('UserStore', {
         throw error
       }
     },
-    logout() {
+    async logout() {
+      // Server clears the httpOnly cookie; the client cannot.
+      try {
+        await $fetch('/api/auth/logout', { method: 'POST' })
+      }
+      catch (error) {
+        console.error('Error during logout:', error)
+      }
       this.currentUser = null
-      const userCookie = useCookie(AuthSettings.cookie.name, AuthSettings.cookie.options)
-      userCookie.value = null
     },
     setCurrentUser(user: AppUser) {
       this.currentUser = user

@@ -7,8 +7,8 @@ useHead({
   },
 })
 
-onMounted(() => {
-  userStore.logout()
+onMounted(async () => {
+  await userStore.logout()
   const toast = useToast()
   toast.add({
     title: 'Ausgeloggt',

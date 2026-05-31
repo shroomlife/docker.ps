@@ -7,10 +7,6 @@ const router = useRouter()
 const runtimeConfig = useRuntimeConfig()
 const appVersion = runtimeConfig.public.appVersion || '0.0.0'
 
-if (!userStore.hasAuthCookie()) {
-  await navigateTo('/profile/login')
-}
-
 const appTopNavigation = useAppTopNavigation()
 const appMainNavigation = useAppMainNavigation()
 const appFooterNavigation = useAppFooterNavigation()
