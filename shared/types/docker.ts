@@ -1,8 +1,14 @@
 import type { DockerHost } from '../prisma/client'
 
+/**
+ * A DockerHost safe to send to the client: the encrypted `authKey` secret is
+ * never exposed. Use this for every client-facing response and client state.
+ */
+export type DockerHostPublic = Omit<DockerHost, 'authKey'>
+
 export interface DockerStoreState {
-  currentHost: DockerHost | null
-  availableHosts: DockerHost[]
+  currentHost: DockerHostPublic | null
+  availableHosts: DockerHostPublic[]
   isLoadingContainers: boolean
   containers: DockerStoreContainer[]
   blockedContainerIds: string[]

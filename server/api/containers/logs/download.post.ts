@@ -10,16 +10,7 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>) =>
     throw createError({ statusCode: 400, statusMessage: 'Host UUID and Container ID are required' })
   }
 
-  const dockerHost = await prismaClient.dockerHost.findUniqueOrThrow({
-    where: {
-      uuid: body.hostUuid,
-      userId: user.id,
-    },
-  })
-
-  if (!dockerHost) {
-    throw createError({ statusCode: 404, statusMessage: 'Docker Host Not Found' })
-  }
+  const dockerHost = await DockerHostService.getForUserOrFail(body.hostUuid, user.id)
 
   // Build URL for download endpoint
   const url = new URL(`/containers/${body.containerId}/logs/download`, dockerHost.url)
@@ -29,7 +20,7 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>) =>
       method: 'GET',
       url: url.toString(),
       headers: {
-        'x-auth-key': dockerHost.authKey,
+        'x-auth-key': DockerHostService.resolveAuthKey(dockerHost),
       },
       responseType: 'text',
       timeout: 300000, // 5 minutes timeout for large log files

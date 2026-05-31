@@ -11,7 +11,12 @@ definePageMeta({
 const schema = v.object({
   name: v.pipe(v.string(), v.minLength(1, 'Name is required')),
   url: v.pipe(v.string(), v.url('Invalid URL')),
-  authKey: v.pipe(v.string(), v.minLength(128, 'Auth Key must be at least 128 characters long'), v.startsWith('docker_ps_', 'Auth Key must start with "docker_ps_"')),
+  // Optional on edit: an empty value keeps the currently stored key, a provided
+  // value must be a valid auth key. The secret is never sent back to the client.
+  authKey: v.union([
+    v.literal(''),
+    v.pipe(v.string(), v.minLength(128, 'Auth Key must be at least 128 characters long'), v.startsWith('docker_ps_', 'Auth Key must start with "docker_ps_"')),
+  ]),
 })
 
 type Schema = v.InferOutput<typeof schema>
@@ -56,7 +61,7 @@ const breadcrumbItems = ref([
 ])
 
 onMounted(async () => {
-  const currentHost = await $fetch<DockerHost>('/api/hosts', {
+  const currentHost = await $fetch<DockerHostPublic>('/api/hosts', {
     method: 'POST',
     body: {
       hostUuid: dockerStore.getCurrentHost?.uuid,
@@ -64,7 +69,8 @@ onMounted(async () => {
   })
   state.name = currentHost.name
   state.url = currentHost.url
-  state.authKey = currentHost.authKey
+  // authKey is intentionally not prefilled — the secret never leaves the server.
+  // Leaving it blank keeps the stored key (see edit.post.ts).
 })
 </script>
 
@@ -111,11 +117,13 @@ onMounted(async () => {
         size="xl"
         label="Docker Host Auth Key"
         name="authKey"
+        description="Leave blank to keep the current key."
       >
         <UInput
           v-model="state.authKey"
           class="w-full"
           type="password"
+          placeholder="••••••••  (unchanged)"
         />
       </UFormField>
 

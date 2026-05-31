@@ -67,16 +67,7 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>) =>
     throw createError({ statusCode: 400, statusMessage: 'Host UUID and Container ID are required' })
   }
 
-  const dockerHost = await prismaClient.dockerHost.findUniqueOrThrow({
-    where: {
-      uuid: hostUuid,
-      userId: user.id,
-    },
-  })
-
-  if (!dockerHost) {
-    throw createError({ statusCode: 404, statusMessage: 'Docker Host Not Found' })
-  }
+  const dockerHost = await DockerHostService.getForUserOrFail(hostUuid, user.id)
 
   const url = new URL(`/containers/${containerId}/logs/stream`, dockerHost.url)
   url.searchParams.set('tail', tail)
@@ -100,7 +91,7 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>) =>
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
-        'x-auth-key': dockerHost.authKey,
+        'x-auth-key': DockerHostService.resolveAuthKey(dockerHost),
         'accept': 'text/event-stream',
       },
       signal: controller.signal,

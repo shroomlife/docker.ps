@@ -14,7 +14,7 @@ export const useDockerStore = defineStore('DockerStore', {
   },
   actions: {
     async addHost(name: string, url: string, authKey: string) {
-      const newHost = await $fetch<DockerHost>('/api/hosts/add', {
+      const newHost = await $fetch<DockerHostPublic>('/api/hosts/add', {
         method: 'POST',
         body: {
           name,
@@ -32,7 +32,7 @@ export const useDockerStore = defineStore('DockerStore', {
       if (!uuid) {
         throw new Error('Host UUID is required for update')
       }
-      const updatedHost = await $fetch<DockerHost>(`/api/hosts/edit`, {
+      const updatedHost = await $fetch<DockerHostPublic>(`/api/hosts/edit`, {
         method: 'POST',
         body: {
           uuid,
@@ -41,7 +41,7 @@ export const useDockerStore = defineStore('DockerStore', {
           authKey,
         } as DockerHostEditRequestBody,
       })
-      const index = this.availableHosts.findIndex((host: DockerHost) => host.uuid === uuid)
+      const index = this.availableHosts.findIndex((host: DockerHostPublic) => host.uuid === uuid)
       if (index !== -1) {
         this.availableHosts[index] = updatedHost
         if (this.currentHost?.uuid === uuid) {
@@ -50,7 +50,7 @@ export const useDockerStore = defineStore('DockerStore', {
       }
     },
 
-    addHosts(hosts: DockerHost[]) {
+    addHosts(hosts: DockerHostPublic[]) {
       this.availableHosts = hosts
       this.loadCurrentHostFromSession()
     },
@@ -62,7 +62,7 @@ export const useDockerStore = defineStore('DockerStore', {
 
     async setCurrentHost(uuid: string) {
       if (this.getCurrentHost?.uuid === uuid) return
-      const foundHost = this.availableHosts.find((host: DockerHost) => host.uuid === uuid)
+      const foundHost = this.availableHosts.find((host: DockerHostPublic) => host.uuid === uuid)
       if (foundHost) {
         if (this.currentHost?.uuid === foundHost.uuid) return
         this.resetHostData()
@@ -77,7 +77,7 @@ export const useDockerStore = defineStore('DockerStore', {
     loadCurrentHostFromSession() {
       const storedUuid = sessionStorage.getItem('dockerCurrentHostUuid')
       if (storedUuid) {
-        const foundHost = this.availableHosts.find((host: DockerHost) => host.uuid === storedUuid)
+        const foundHost = this.availableHosts.find((host: DockerHostPublic) => host.uuid === storedUuid)
         if (foundHost) {
           this.currentHost = foundHost
         }

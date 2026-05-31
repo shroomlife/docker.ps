@@ -73,7 +73,7 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): P
       },
       include: {
         identities: true,
-        dockerHosts: true,
+        dockerHosts: { omit: { authKey: true } },
       },
     })
 

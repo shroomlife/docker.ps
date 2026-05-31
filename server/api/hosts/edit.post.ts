@@ -1,20 +1,12 @@
 import type { H3Event, EventHandlerRequest } from 'h3'
 
-export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): Promise<DockerHost> => {
+export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): Promise<DockerHostPublic> => {
   const currentUser = await AuthService.getUserOrFail(event)
 
   const body = await readBody(event) as DockerHostEditRequestBody
 
-  const dockerHost = await prismaClient.dockerHost.findUniqueOrThrow({
-    where: {
-      uuid: body.uuid,
-      userId: currentUser.id,
-    },
-  })
-
-  if (!dockerHost) {
-    throw createError({ statusCode: 404, statusMessage: 'Docker Host Not Found' })
-  }
+  // Authz: throws (P2025) if the host does not belong to this user.
+  await DockerHostService.getForUserOrFail(body.uuid, currentUser.id)
 
   if (!body.url) {
     throw createError({ statusCode: 400, statusMessage: 'URL is required' })
@@ -26,9 +18,12 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): P
       userId: currentUser.id,
     },
     data: {
-      authKey: body.authKey,
       name: body.name,
       url: body.url,
+      // "Leave blank to keep current": only rotate the secret when a new one
+      // is provided — never overwrite the stored key with an empty value.
+      ...(body.authKey ? { authKey: DockerHostService.encryptAuthKey(body.authKey) } : {}),
     },
+    omit: { authKey: true },
   })
 })

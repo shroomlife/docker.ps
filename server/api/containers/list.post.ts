@@ -6,22 +6,13 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): P
   const user = await AuthService.getUserOrFail(event)
   const body = await readBody(event) as DockerContainerListRequest
 
-  const dockerHost = await prismaClient.dockerHost.findUniqueOrThrow({
-    where: {
-      uuid: body.hostUuid,
-      userId: user.id,
-    },
-  })
-
-  if (!dockerHost) {
-    throw createError({ statusCode: 404, statusMessage: 'Docker Host Not Found' })
-  }
+  const dockerHost = await DockerHostService.getForUserOrFail(body.hostUuid, user.id)
 
   const remoteDockerContainers = await axios<ContainerInfo[]>({
     method: 'GET',
     url: new URL('/containers', dockerHost.url).toString(),
     headers: {
-      'x-auth-key': dockerHost.authKey,
+      'x-auth-key': DockerHostService.resolveAuthKey(dockerHost),
     },
   })
 

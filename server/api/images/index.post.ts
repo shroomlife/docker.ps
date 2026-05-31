@@ -9,22 +9,13 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): P
     throw createError({ statusCode: 400, statusMessage: 'Host UUID and Image ID are required' })
   }
 
-  const dockerHost = await prismaClient.dockerHost.findUniqueOrThrow({
-    where: {
-      uuid: body.hostUuid,
-      userId: user.id,
-    },
-  })
-
-  if (!dockerHost) {
-    throw createError({ statusCode: 404, statusMessage: 'Docker Host Not Found' })
-  }
+  const dockerHost = await DockerHostService.getForUserOrFail(body.hostUuid, user.id)
 
   const remoteDockerImage = await axios<ImageInspectInfo>({
     method: 'GET',
     url: new URL(`/images/${body.imageId}`, dockerHost.url).toString(),
     headers: {
-      'x-auth-key': dockerHost.authKey,
+      'x-auth-key': DockerHostService.resolveAuthKey(dockerHost),
     },
   })
 

@@ -42,7 +42,7 @@ export const AuthService = {
           uuid: decodedCookieData.userId,
           AND: { identities: { some: { uuid: decodedCookieData.identityId } } },
         },
-        include: { dockerHosts: true },
+        include: { dockerHosts: { omit: { authKey: true } } },
       })
 
       if (!foundUser) {

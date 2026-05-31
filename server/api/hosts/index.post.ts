@@ -1,6 +1,6 @@
 import type { H3Event, EventHandlerRequest } from 'h3'
 
-export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): Promise<DockerHost> => {
+export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): Promise<DockerHostPublic> => {
   const currentUser = await AuthService.getUserOrFail(event)
   const body = await readBody(event) as DockerHostGetRequest
 
@@ -13,5 +13,6 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): P
       uuid: body.hostUuid,
       userId: currentUser.id,
     },
+    omit: { authKey: true },
   })
 })
