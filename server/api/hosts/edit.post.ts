@@ -12,6 +12,8 @@ export default defineEventHandler(async (event: H3Event<EventHandlerRequest>): P
     throw createError({ statusCode: 400, statusMessage: 'URL is required' })
   }
 
+  await assertSafeAgentUrlFromConfig(body.url)
+
   return await prismaClient.dockerHost.update({
     where: {
       uuid: body.uuid,

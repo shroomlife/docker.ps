@@ -24,6 +24,9 @@ export default defineNuxtConfig({
     cookieSecret: process.env.NUXT_COOKIE_SECRET ?? '',
     jwtSecret: process.env.NUXT_JWT_SECRET ?? '',
     secretKey: process.env.NUXT_SECRET_KEY || '',
+    // SSRF policy: block private/RFC1918/loopback agent URLs (multi-tenant SaaS
+    // hardening). Default off so self-host can manage agents on private LANs.
+    ssrfBlockPrivate: process.env.NUXT_SSRF_BLOCK_PRIVATE === 'true',
     public: {
       appVersion: version,
       appUrl: process.env.NUXT_PUBLIC_APP_URL || 'http://localhost:3000',

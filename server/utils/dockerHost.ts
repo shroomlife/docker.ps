@@ -1,6 +1,7 @@
 import type { DockerHost } from '~~/shared/prisma/client'
 
 import { decryptSecret, encryptSecret, isEncryptedSecret } from './crypto'
+import { assertSafeAgentUrlFromConfig } from './ssrfGuard'
 
 /**
  * Tolerant read of a stored authKey: decrypts AES-256-GCM blobs and lets legacy
@@ -19,14 +20,18 @@ export const DockerHostService = {
   /**
    * Load a host scoped to its owner. `uuid` is the unique selector, `userId`
    * an additional authz filter — throws (P2025) if no matching row exists.
+   * Also re-validates the stored URL against the SSRF policy (defense in depth:
+   * every agent call funnels through here), throwing a 400 on a blocked target.
    */
   async getForUserOrFail(uuid: string, userId: number): Promise<DockerHost> {
-    return await prismaClient.dockerHost.findUniqueOrThrow({
+    const host = await prismaClient.dockerHost.findUniqueOrThrow({
       where: {
         uuid,
         userId,
       },
     })
+    await assertSafeAgentUrlFromConfig(host.url)
+    return host
   },
 
   /** Decrypt a host's stored authKey for use as the agent `x-auth-key` header. */
